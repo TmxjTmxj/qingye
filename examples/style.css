@@ -1,0 +1,16 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #fafcf9; color: #243c35; font-family: 'Microsoft YaHei UI', sans-serif; }
+header { display: flex; justify-content: space-between; align-items: center; padding: 23px 26px; border-bottom: 1px solid #e1e9e4; }
+header b { font-size: 18px; } header span { font-size: 11px; color: #77867e; }
+main { padding: 35px 28px; max-width: 720px; margin: auto; }
+.eyebrow { font-size: 10px; letter-spacing: 2px; color: #759a88; margin: 0 0 24px; }
+h1 { font-size: 44px; line-height: 1.35; letter-spacing: -1px; font-weight: 600; margin: 0; }
+.intro { color: #7b8982; font-size: 13px; line-height: 1.95; margin: 23px 0; }
+button { background: #28664d; color: white; border: 0; padding: 14px 20px; border-radius: 6px; cursor: pointer; }
+section { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 36px; }
+article { border: 1px solid #e0e8e2; border-radius: 8px; padding: 18px 15px; background: white; }
+small { color: #86a394; font-size: 9px; letter-spacing: 1px; }
+h3 { font-size: 15px; font-weight: 500; margin: 15px 0 9px; }
+article p { font-size: 11px; line-height: 1.8; color: #849088; }
+footer { font-size: 10px; color: #98a69e; margin-top: 28px; }
+@media (max-width: 420px) { header span { display: none; } h1 { font-size: 36px; } main { padding: 26px 20px; } }

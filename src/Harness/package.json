@@ -1,0 +1,9 @@
+{
+  "name": "qingye-harness",
+  "private": true,
+  "type": "module",
+  "description": "Portable DeepSeek Harness composition for the Qingye native editor",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.1-rc.5"
+  }
+}

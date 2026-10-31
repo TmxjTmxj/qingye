@@ -1,0 +1,3 @@
+api地址：https://api.example.com/v1
+key：YOUR_API_KEY
+模型：YOUR_MODEL_NAME

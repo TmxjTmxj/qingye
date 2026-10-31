@@ -1,0 +1,2 @@
+# Preserve formatting in the original upstream license texts.
+licenses/*.txt -whitespace
