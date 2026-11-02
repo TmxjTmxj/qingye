@@ -24,6 +24,7 @@ try {
   $blocked=$false;try{Assert-ContainedTree $root $fixture | Out-Null}catch{$blocked=$true};if(-not $blocked){throw 'Junction was not refused'}
   [IO.Directory]::Delete($link)
   Write-Output 'PASS packaging guard refuses linked directories'
+  New-Item -ItemType Directory -Path (Join-Path $root 'app') -Force | Out-Null
   [IO.File]::WriteAllText($personal,'synthetic test only')
   & (Join-Path $root 'scripts/package.ps1')
   Add-Type -AssemblyName System.IO.Compression.FileSystem
