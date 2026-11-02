@@ -19,12 +19,8 @@ function Copy-UnchangedSafe([string]$Source,[string]$Destination) {
     if ((Test-Path -LiteralPath $Destination) -and ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash)) { return }
     Copy-Item -LiteralPath $Source -Destination $Destination -Force
 }
-Compile (@('/target:exe',('/out:' + (Join-Path $outputRoot 'CoreTests.exe'))) + $references + $coreSources + (Join-Path $projectRoot 'tests/CoreTests.cs') + (Join-Path $projectRoot 'tests/HarnessCoreTests.cs'))
+Compile (@('/target:exe',('/out:' + (Join-Path $outputRoot 'CoreTests.exe'))) + $references + $coreSources + (Join-Path $projectRoot 'tests/CoreTests.cs'))
 if ($Stage -eq 'Core') { exit 0 }
-$harnessRuntime = Join-Path $projectRoot 'build/harness-runtime'
-if (Test-Path -LiteralPath $harnessRuntime) {
-    foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/Harness') -Filter '*.mjs' | Select-Object -ExpandProperty Name)) { Copy-Item -LiteralPath (Join-Path $projectRoot "src/Harness/$file") -Destination (Join-Path $harnessRuntime $file) -Force }
-}
 $lock = Get-Content -LiteralPath (Join-Path $projectRoot 'packages.lock.json') -Raw | ConvertFrom-Json
 foreach ($package in $lock) {
     $packagePath = Join-Path $projectRoot "build/packages/$($package.id)/$($package.version)"
@@ -52,11 +48,12 @@ $appSources = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src') -Filte
 $versionSource = Join-Path $projectRoot 'build/AssemblyVersion.g.cs'
 @("using System.Reflection;", "[assembly: AssemblyVersion(`"$projectVersion.0`")]", "[assembly: AssemblyFileVersion(`"$projectVersion.0`")]") | Set-Content -LiteralPath $versionSource -Encoding UTF8
 $appSources += $versionSource
+$terminalResources = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/Assets/Terminal') -File | ForEach-Object { '/resource:' + $_.FullName + ',Qingye.Terminal.' + $_.Name })
 $iconResources = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/Assets/Icons') -Filter '*.svg' | ForEach-Object { '/resource:' + $_.FullName + ',Qingye.Icons.' + $_.Name })
-Compile (@('/target:winexe','/platform:x64','/main:Qingye.Program',('/out:' + (Join-Path $outputRoot '轻页.exe')),('/win32icon:' + $applicationIcon),('/resource:' + $applicationIcon + ',Qingye.Application.ico')) + $appReferences + $appSources + $iconResources)
+Compile (@('/target:winexe','/platform:x64','/main:Qingye.Program',('/out:' + (Join-Path $outputRoot '轻页.exe')),('/win32icon:' + $applicationIcon),('/resource:' + $applicationIcon + ',Qingye.Application.ico')) + $appReferences + $appSources + $iconResources + $terminalResources)
 Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot '轻页.exe.config') -Force
 if (Test-Path -LiteralPath (Join-Path $projectRoot 'tests/UiTests.cs')) {
-    Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.UiTests',('/out:' + (Join-Path $outputRoot 'UiTests.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/UiTests.cs') + (Join-Path $projectRoot 'tests/HarnessUiTests.cs'))
+    Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.UiTests',('/out:' + (Join-Path $outputRoot 'UiTests.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/UiTests.cs'))
     Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'UiTests.exe.config') -Force
 }
 Write-Output "Build ready: $outputRoot"
@@ -65,7 +62,8 @@ if (Test-Path -LiteralPath (Join-Path $projectRoot 'tests/PickerTests.cs')) {
     Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.PickerTests',('/out:' + (Join-Path $outputRoot 'PickerTests.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + $automationReferences + (Join-Path $projectRoot 'tests/PickerTests.cs'))
     Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'PickerTests.exe.config') -Force
 }
-if (Test-Path -LiteralPath (Join-Path $projectRoot 'tests/ExperienceHarness.cs')) {
-    Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.ExperienceHarness',('/out:' + (Join-Path $outputRoot 'ExperienceHarness.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/ExperienceHarness.cs') + (Join-Path $projectRoot 'tests/HarnessExperience.cs') + (Join-Path $projectRoot 'tests/HarnessOptimizationExperience.cs'))
-    Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'ExperienceHarness.exe.config') -Force
-}
+$experienceSource=Join-Path $projectRoot 'tests/DesktopExperience.cs'
+Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.DesktopExperience',('/out:' + (Join-Path $outputRoot 'ExperienceHarness.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + $experienceSource + (Join-Path $projectRoot 'tests/TerminalAcceptance.cs'))
+Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'ExperienceHarness.exe.config') -Force
+
+Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.TerminalProbe',('/out:' + (Join-Path $outputRoot 'TerminalProbe.exe'))) + $references + (Join-Path $projectRoot 'tests/TerminalProbe.cs'))

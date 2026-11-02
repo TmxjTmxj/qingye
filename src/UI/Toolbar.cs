@@ -24,7 +24,7 @@ namespace Qingye.UI
         readonly List<Button> windowButtons=new List<Button>();
         internal readonly List<Button> toolButtons=new List<Button>();
         readonly List<Border> separators=new List<Border>();
-        internal readonly Button appearanceButton,saveButton,moreTools,agentButton;
+        internal readonly Button appearanceButton,saveButton,moreTools,terminalButton;
         internal Toolbar(MainWindow window)
         {
             owner=window;
@@ -88,13 +88,13 @@ namespace Qingye.UI
             {
                 Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(2,0,14,0)
             };
-            var logo=Theme.Icon("\uE8A5",30);
+            var logo=new Image{Source=owner.Icon,Width=30,Height=30};
             logo.Margin=new Thickness(0,0,11,0);
-            logo.SetResourceReference(TextBlock.ForegroundProperty,"AccentBrush");
+
             brand.Children.Add(logo);
             brandName=new TextBlock
             {
-                Text="轻页",FontSize=22,FontWeight=FontWeights.SemiBold
+                Text="轻页",FontSize=19,FontWeight=FontWeights.SemiBold
             };
             brand.Children.Add(brandName);
             header.Children.Add(brand);
@@ -106,7 +106,7 @@ namespace Qingye.UI
             header.Children.Add(tools);
             AddTool(tools,Theme.Button("\uE7C3","新建",delegate
             {
-                owner.NewDocument(false);
+                owner.NewDocument(true);
             }
             ));
             AddTool(tools,Theme.Button("\uE8E5","打开",delegate
@@ -188,12 +188,11 @@ namespace Qingye.UI
             };
             AddTool(tools,appearanceButton);
             AddSeparator(tools);
-            agentButton=Theme.Button("sparkles","Agent",delegate{if(owner.Current!=null||owner.WorkspaceRoot!=null)owner.ToggleAgent();});
-            agentButton.ToolTip="Agent  Ctrl+Alt+A";
-            System.Windows.Automation.AutomationProperties.SetName(agentButton,"Agent");
-            agentButton.SetResourceReference(Control.ForegroundProperty,"AccentBrush");
-            Theme.Tint(agentButton,"AccentBrush");
-            AddTool(tools,agentButton);
+            terminalButton=Theme.Button("terminal","终端",owner.ToggleTerminal);
+            terminalButton.ToolTip="CMD  Ctrl+`";
+            System.Windows.Automation.AutomationProperties.SetName(terminalButton,"终端");
+            AddTool(tools,terminalButton);
+            var newMenu=new ContextMenu();newMenu.Items.Add(Theme.Menu("新建文件  Ctrl+N",()=>owner.NewDocument(true)));newMenu.Items.Add(Theme.Menu("新建独立窗口  Ctrl+Shift+N",owner.NewWindow));toolButtons[0].ContextMenu=newMenu;
             owner.RegisterName("AppearanceButton",appearanceButton);
             moreTools=Theme.Button("ellipsis","",delegate
             {

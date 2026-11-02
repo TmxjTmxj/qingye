@@ -33,7 +33,7 @@ namespace Qingye.Core
                 foreach (string child in Directory.EnumerateDirectories(directory))
                 {
                     token.ThrowIfCancellationRequested();
-                    if (!AgentWorkspace.ShouldSkipDirectory(Path.GetFileName(child))) Walk(child, files, limit, depth + 1, token);
+                    if (!DirectoryPolicy.ShouldSkipDirectory(Path.GetFileName(child))) Walk(child, files, limit, depth + 1, token);
                     if (files.Count >= limit) return;
                 }
             }

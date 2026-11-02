@@ -16,13 +16,13 @@ namespace Qingye.UI
         internal readonly WorkspaceTree Workspace;
         internal readonly SearchBar Search;
         internal readonly SidePanel Side;
-        internal readonly AgentPanel Agent;
+        internal readonly TerminalPanel Terminal;
         internal EditorPane Primary { get { return window.primary; } }
         internal EditorPane Secondary { get { return window.secondary; } }
         internal PreviewPane Preview { get { return window.preview; } }
         internal Popup AppearancePopup { get { return Appearance.Popup; } }
         internal WindowTestHooks(MainWindow owner, Toolbar toolbar, DocumentBar documentBar,
-            Footer footer, TabStrip tabs, AppearancePopup appearance, WorkspaceTree workspace, SearchBar search, SidePanel side, AgentPanel agent)
+            Footer footer, TabStrip tabs, AppearancePopup appearance, WorkspaceTree workspace, SearchBar search, SidePanel side, TerminalPanel terminal)
         {
             window = owner;
             Toolbar = toolbar;
@@ -33,7 +33,7 @@ namespace Qingye.UI
             Workspace = workspace;
             Search = search;
             Side = side;
-            Agent = agent;
+            Terminal = terminal;
         }
         internal void Activate(EditorPane pane) { window.ActivatePane(pane); }
         internal void ToggleSearch() { window.ToggleSearch(); }

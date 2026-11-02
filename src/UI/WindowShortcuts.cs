@@ -22,19 +22,10 @@ namespace Qingye.UI
         internal static void Handle(MainWindow owner,KeyEventArgs e)
         {
             bool control=(Keyboard.Modifiers&ModifierKeys.Control)!=0,shift=(Keyboard.Modifiers&ModifierKeys.Shift)!=0,alt=(Keyboard.Modifiers&ModifierKeys.Alt)!=0;
-            if(control && alt)
-            {
-                switch(e.Key)
-                {
-                    case Key.A: owner.ToggleAgent(); e.Handled=true; return;
-                    case Key.P: owner.PrintCurrent(); e.Handled=true; return;
-                    case Key.F: owner.ToggleAgentFocus(); e.Handled=true; return;
-                    case Key.N: owner.NewAgentTask(); e.Handled=true; return;
-                    case Key.H: owner.ToggleAgentHistory(); e.Handled=true; return;
-                    case Key.M: owner.OpenAgentSettings(); e.Handled=true; return;
-                    case Key.S: owner.StopAgent(); e.Handled=true; return;
-                }
-            }
+            if(control && e.Key==Key.Oem3){owner.ToggleTerminal();e.Handled=true;return;}
+            if(control && shift && e.Key==Key.N){owner.NewWindow();e.Handled=true;return;}
+            if(control && alt && e.Key==Key.P){owner.PrintCurrent();e.Handled=true;return;}
+            if(owner.terminalPanel.IsKeyboardFocusWithin)return;
             if(e.Key==Key.Escape && owner.search.searchStrip.Visibility==Visibility.Visible)
             {
                 owner.ToggleSearch();
@@ -51,12 +42,6 @@ namespace Qingye.UI
                     int direction=e.Key==Key.PageUp || e.Key==Key.Tab && shift ? -1 : 1;
                     owner.SelectDocument(owner.Session.Documents[(current+direction+count)%count],null);
                 }
-                e.Handled=true;
-                return;
-            }
-            if(e.Key==Key.L)
-            {
-                owner.ShowAgent();
                 e.Handled=true;
                 return;
             }
@@ -95,7 +80,7 @@ namespace Qingye.UI
             }
             else if(e.Key==Key.N)
             {
-                owner.NewDocument(shift);
+                owner.NewDocument(true);
                 e.Handled=true;
             }
             else if(e.Key==Key.S)

@@ -40,7 +40,7 @@ namespace Qingye.Core
             if (job == IntPtr.Zero || !SetInformationJobObject(job, 9, ref limits, (uint)Marshal.SizeOf(limits)) || !AssignProcessToJobObject(job, process.Handle)) {
                 Dispose();
                 process.Kill();
-                throw new InvalidOperationException("无法建立 Harness 进程生命周期。请重试或检查系统策略。");
+                throw new InvalidOperationException("无法建立 终端 进程生命周期。请重试或检查系统策略。");
             }
         }
         public void Dispose()

@@ -31,7 +31,7 @@ namespace Qingye.UI
             HorizontalContentAlignment=HorizontalAlignment.Stretch;
             documentBar=new Grid
             {
-                Margin=new Thickness(24,10,20,10)
+                Margin=new Thickness(20,8,16,8)
             };
             documentBar.ColumnDefinitions.Add(new ColumnDefinition());
             documentBar.ColumnDefinitions.Add(new ColumnDefinition
@@ -76,7 +76,7 @@ namespace Qingye.UI
             documentName.FontSize=14;
             documentName.FontWeight=FontWeights.SemiBold;
             documentName.TextTrimming=TextTrimming.CharacterEllipsis;
-            documentType.FontSize=12;
+            documentType.FontSize=11;
             documentType.Margin=new Thickness(0,3,0,0);
             documentType.TextTrimming=TextTrimming.CharacterEllipsis;
             documentType.SetResourceReference(TextBlock.ForegroundProperty,"MutedBrush");
@@ -182,7 +182,7 @@ namespace Qingye.UI
         internal void Resize(double width)
         {
             bool stacked=width<620;
-            documentBar.Margin=stacked?new Thickness(12,6,12,8):new Thickness(24,10,20,10);
+            documentBar.Margin=stacked?new Thickness(12,6,12,8):new Thickness(20,8,16,8);
             Grid.SetColumnSpan(fileInfo,stacked?2:1);
             Grid.SetRow(viewActions,stacked?1:0);
             Grid.SetColumn(viewActions,stacked?0:1);

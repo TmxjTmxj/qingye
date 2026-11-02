@@ -1,2 +1,6 @@
 # Preserve formatting in the original upstream license texts.
 licenses/*.txt -whitespace
+
+# Vendored terminal resources are byte-pinned; preserve them on Windows checkout.
+src/Assets/Terminal/xterm.* -text
+src/Assets/Terminal/addon-*.js -text

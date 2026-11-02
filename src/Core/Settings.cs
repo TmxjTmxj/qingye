@@ -20,7 +20,8 @@ namespace Qingye.Core
         public bool EditorsVertical = true;
         public double EditorRatio = .54;
         public double PreviewRatio = .48;
-        public double AgentWidth = 380;
+        public double TerminalSize = 260;
+        public string TerminalDock = "bottom";
         public static Settings Load(string path)
         {
             try
@@ -36,7 +37,8 @@ namespace Qingye.Core
                     if(!Regex.IsMatch(value.Accent??"","^#[0-9A-Fa-f]{6}$"))value.Accent="";
                     value.FontSize=Math.Max(10,Math.Min(40,Double.IsNaN(value.FontSize)?15:value.FontSize));
                     value.EditorRatio=Math.Max(.2,Math.Min(.8,value.EditorRatio));value.PreviewRatio=Math.Max(.2,Math.Min(.7,value.PreviewRatio));
-                    value.AgentWidth=Math.Max(300,Math.Min(620,Double.IsNaN(value.AgentWidth)?380:value.AgentWidth));
+                    value.TerminalSize=Math.Max(140,Math.Min(620,Double.IsNaN(value.TerminalSize)?260:value.TerminalSize));
+                    if(value.TerminalDock!="right")value.TerminalDock="bottom";
                     return value;
                 }
             }

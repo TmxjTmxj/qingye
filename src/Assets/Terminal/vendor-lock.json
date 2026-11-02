@@ -1,0 +1,39 @@
+[
+  {
+    "package": "@xterm/xterm",
+    "version": "6.0.0",
+    "source": "https://registry.npmjs.org/@xterm/xterm/-/xterm-6.0.0.tgz",
+    "integrity": "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==",
+    "files": {
+      "xterm.js": "14903579ff54664cd72f8e8699e6961a6272c21863ec1c3b118cdc8af5d4a972",
+      "xterm.css": "854a7c0fb70e8b1a083c16797ab827299fb18744f5ad34f227b48337e33293c6"
+    }
+  },
+  {
+    "package": "@xterm/addon-fit",
+    "version": "0.11.0",
+    "source": "https://registry.npmjs.org/@xterm/addon-fit/-/addon-fit-0.11.0.tgz",
+    "integrity": "sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==",
+    "files": {
+      "addon-fit.js": "ba3ea256ce0620a0992a197d6c9baea64823fc93d8da07a9e366ca9943c18527"
+    }
+  },
+  {
+    "package": "@xterm/addon-unicode-graphemes",
+    "version": "0.4.0",
+    "source": "https://registry.npmjs.org/@xterm/addon-unicode-graphemes/-/addon-unicode-graphemes-0.4.0.tgz",
+    "integrity": "sha512-9+/CqwbKcnlkJU4d3wIgO+wjsL8f6vyz+UwUWLu6nADQz8Gr8ONqGCJfdDjIdI+yYZLABQqQy47FzEM6AWELjw==",
+    "files": {
+      "addon-unicode-graphemes.js": "8e7f926f4def5733a190b80cff5cbaa550404e143b0750962f7d756138203cb8"
+    }
+  },
+  {
+    "package": "@xterm/addon-webgl",
+    "version": "0.19.0",
+    "source": "https://registry.npmjs.org/@xterm/addon-webgl/-/addon-webgl-0.19.0.tgz",
+    "integrity": "sha512-b3fMOsyLVuCeNJWxolACEUED0vm7qC0cy4wRvf3oURSzDTYVQiGPhTnhWZwIHdvC48Y+oLhvYXnY4XDXPoJo6A==",
+    "files": {
+      "addon-webgl.js": "b85f8d4b3e9756bebb757e3fe47134d70f03ea3d6b187624426d2e2b65dec06c"
+    }
+  }
+]

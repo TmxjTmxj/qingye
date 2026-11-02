@@ -40,10 +40,10 @@ namespace Qingye.UI
         internal readonly SearchBar search;
         readonly WorkspaceTree workspace;
         readonly SidePanel sidePanel;
-        readonly AgentPanel agentPanel;
-        readonly GridSplitter agentSplitter;
-        readonly AgentDockLayout agentDock;
-        bool agentVisible;
+        internal readonly TerminalPanel terminalPanel;
+        readonly GridSplitter terminalSplitter;
+        readonly TerminalDockLayout terminalDock;
+        internal bool terminalVisible;
         readonly System.Windows.Threading.DispatcherTimer refreshTimer=new System.Windows.Threading.DispatcherTimer();
         readonly string preferencesPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"preferences.xml");
         internal readonly BoundedOpenQueue openQueue;
@@ -68,8 +68,8 @@ namespace Qingye.UI
         internal void ToggleSearch(){search.ToggleSearch();}
         public int ReplaceAll(string text,string value,bool useRegex,bool matchCase){return search.ReplaceAll(text,value,useRegex,matchCase);}
         internal void ShowGoToLine(){search.ShowGoToLine();}
-        public void ImportWorkspace(string path){workspace.ImportWorkspace(path);sidePanel.Reveal();sidePanel.SetMode(false);sidePanel.RefreshFiles();footer.sessionHint.Text="临时工作区 · 退出即清空";UpdateToolbar();agentPanel.UpdateContext();}
-        internal void ClearWorkspace(){workspace.ClearWorkspace();footer.sessionHint.Text="本次阅读 · 不保留文件列表";sidePanel.RefreshFiles();UpdateToolbar();agentPanel.UpdateContext();}
+        public void ImportWorkspace(string path){workspace.ImportWorkspace(path);sidePanel.Reveal();sidePanel.SetMode(false);sidePanel.RefreshFiles();footer.sessionHint.Text="临时工作区 · 退出即清空";UpdateToolbar();}
+        internal void ClearWorkspace(){workspace.ClearWorkspace();footer.sessionHint.Text="本次阅读 · 不保留文件列表";sidePanel.RefreshFiles();UpdateToolbar();}
         public MainWindow()
         {
             Session=new DocumentSession();Appearance=Settings.Load(preferencesPath);Appearance.Layout="single";
@@ -85,11 +85,11 @@ namespace Qingye.UI
             documentBar=new DocumentBar(this);Grid.SetRow(documentBar,2);root.Children.Add(documentBar);
             search=new SearchBar(this);Grid.SetRow(search,3);root.Children.Add(search);
             footer=new Footer(this);Grid.SetRow(footer,5);root.Children.Add(footer);
-            appearancePopup=new AppearancePopup(this);workspace=new WorkspaceTree(this);sidePanel=new SidePanel(this,workspace);agentPanel=new AgentPanel(this);
+            appearancePopup=new AppearancePopup(this);workspace=new WorkspaceTree(this);sidePanel=new SidePanel(this,workspace);terminalPanel=new TerminalPanel(this);
             tabStrip=new TabStrip(this);layoutHost=new PaneLayout(this,tabStrip);layoutHost.SetResourceReference(Panel.BackgroundProperty,"SurfaceBrush");
-            Grid.SetRow(shellWork,4);root.Children.Add(shellWork);shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition());shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.Children.Add(sidePanel);Grid.SetColumn(layoutHost,2);shellWork.Children.Add(layoutHost);shellWork.Children.Add(agentPanel);Grid.SetColumn(agentPanel,4);
-            agentSplitter=new GridSplitter{HorizontalAlignment=HorizontalAlignment.Stretch,VerticalAlignment=VerticalAlignment.Stretch,ResizeDirection=GridResizeDirection.Columns,ResizeBehavior=GridResizeBehavior.PreviousAndNext,ShowsPreview=false};agentSplitter.SetResourceReference(Control.BackgroundProperty,"LineBrush");Grid.SetColumn(agentSplitter,3);shellWork.Children.Add(agentSplitter);agentSplitter.DragCompleted+=delegate{Appearance.AgentWidth=Math.Max(300,Math.Min(620,agentPanel.ActualWidth));};
-            agentDock=new AgentDockLayout(shellWork,layoutHost,sidePanel,agentPanel,agentSplitter);
+            Grid.SetRow(shellWork,4);root.Children.Add(shellWork);shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition());shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.Children.Add(sidePanel);Grid.SetColumn(layoutHost,2);shellWork.Children.Add(layoutHost);shellWork.Children.Add(terminalPanel);Grid.SetColumn(terminalPanel,4);
+            terminalSplitter=new GridSplitter{HorizontalAlignment=HorizontalAlignment.Stretch,VerticalAlignment=VerticalAlignment.Stretch,ResizeDirection=GridResizeDirection.Columns,ResizeBehavior=GridResizeBehavior.PreviousAndNext,ShowsPreview=false};terminalSplitter.SetResourceReference(Control.BackgroundProperty,"LineBrush");Grid.SetColumn(terminalSplitter,3);shellWork.Children.Add(terminalSplitter);terminalSplitter.DragCompleted+=delegate{Appearance.TerminalSize=Math.Max(140,Math.Min(620,terminalDock.Right?terminalPanel.ActualWidth:terminalPanel.ActualHeight));};
+            terminalDock=new TerminalDockLayout(shellWork,layoutHost,sidePanel,terminalPanel,terminalSplitter);
             primary=new EditorPane("primary",buffers,OnBufferChanged,Placement);secondary=new EditorPane("secondary",buffers,OnBufferChanged,Placement);active=primary;
             RegisterName("PrimaryEditor",primary.Editor);RegisterName("SecondaryEditor",secondary.Editor);primary.Activated+=ActivatePane;secondary.Activated+=ActivatePane;
             preview=new PreviewPane();preview.PlaceRequested+=Placement;preview.OpenFileRequested+=path=>Observe(OpenPathsAsync(new[]{path},true));
@@ -99,15 +99,15 @@ namespace Qingye.UI
             refreshTimer.Interval=TimeSpan.FromMilliseconds(300);refreshTimer.Tick+=async delegate{refreshTimer.Stop();await UpdatePreviewAsync();};
             AllowDrop=true;PreviewDragOver+=OnDragOver;PreviewDrop+=OnDrop;PreviewKeyDown+=(sender,args)=>WindowShortcuts.Handle(this,args);Closing+=OnClosing;
             SizeChanged+=delegate{bool small=ActualWidth<720;if(small!=narrowLayout){narrowLayout=small;if(showSecondary||showPreview&&Appearance.Layout!="reader")ApplyLayout(Appearance.Layout,!showSecondary);}UpdateToolbar();};
-            Loaded+=delegate{primary.Editor.Focus();UpdateStatus();System.Threading.Tasks.Task.Delay(1000).ContinueWith(delegate{Dispatcher.BeginInvoke(new Action(delegate{agentPanel.PrewarmAsync();}));});};Activated+=delegate{CheckExternalFiles();};
-            TestHooks=new WindowTestHooks(this,toolbar,documentBar,footer,tabStrip,appearancePopup,workspace,search,sidePanel,agentPanel);
+            Loaded+=delegate{primary.Editor.Focus();UpdateStatus();};Activated+=delegate{CheckExternalFiles();};
+            TestHooks=new WindowTestHooks(this,toolbar,documentBar,footer,tabStrip,appearancePopup,workspace,search,sidePanel,terminalPanel);
             NewDocument(true);SetLayout("single");
         }
         internal void UpdateToolbar()
         {
             double width=ActualWidth;toolbar.Resize(width);documentBar.Resize(width);footer.Resize(width);search.RefreshContext();
             shellWork.Margin=width<620?new Thickness(6,0,6,6):new Thickness(12,0,12,8);
-            agentDock.Apply(width,agentVisible,sidePanel.ResolveVisible(WorkspaceRoot!=null,width),Appearance.AgentWidth);
+            terminalDock.Apply(width,ActualHeight,terminalVisible,sidePanel.ResolveVisible(WorkspaceRoot!=null,width),Appearance);
         }
 
         public Document Current {get{return active==null?null:active.BoundDocument;}}
@@ -175,11 +175,10 @@ namespace Qingye.UI
             if(active==null||Current==null)return;var doc=Current;
             Title=doc.Title+(doc.IsDirty?" •":"")+" — 轻页";documentBar.Update(doc);footer.Update(doc,active,openQueueNotice);
             if(sidePanel!=null)sidePanel.RequestOutlineRefresh();
-            if(agentPanel!=null)agentPanel.UpdateContext();
         }
         internal void SetNotice(string message){footer.SetNotice(message);}
         public void SetTheme(string theme){Appearance.Theme=theme;Appearance.Accent="";ApplyAppearance();}
-        internal void ApplyAppearance(){Theme.Apply(this,Appearance);primary.Apply(Appearance);secondary.Apply(Appearance);richEdit.Editor.ApplyTheme(Appearance);RefreshTabs();if(agentPanel!=null)agentPanel.RefreshAppearance();}
+        internal void ApplyAppearance(){Theme.Apply(this,Appearance);primary.Apply(Appearance);secondary.Apply(Appearance);richEdit.Editor.ApplyTheme(Appearance);RefreshTabs();if(terminalPanel!=null)terminalPanel.RefreshAppearance();}
         public void SetLayout(string layout){ApplyLayout(layout,false);}
         internal void ApplyLayout(string layout,bool currentFileOnly)
         {
@@ -190,8 +189,8 @@ namespace Qingye.UI
         }
         internal void ToggleSidePanel(){sidePanel.Toggle();}
         internal void PrintCurrent(){preview.Print(this);}
-        internal void ToggleAgent(){bool wasOpen=agentVisible;agentVisible=!agentVisible;UpdateToolbar();if(agentVisible)agentPanel.FocusInput();else if(wasOpen)FocusDocument();}
-        internal void ToggleAgentFocus(){agentDock.Focused=!agentDock.Focused;UpdateToolbar();}
+        internal void ToggleTerminal(){terminalVisible=!terminalVisible;UpdateToolbar();if(terminalVisible)terminalPanel.Reveal();else active.Editor.Focus();}
+        internal void NewWindow(){Process.Start(new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location){UseShellExecute=false});}
         internal void NavigateToOutline(OutlineItem item){sidePanel.Navigate(item);}
         void Placement(string command)
         {
@@ -240,7 +239,7 @@ namespace Qingye.UI
         async void OnClosing(object sender,System.ComponentModel.CancelEventArgs e)
         {
             if(closing)return;e.Cancel=true;if(!CloseDocuments(Session.Documents.ToArray()))return;closing=true;openQueue.CancelWaiting();refreshTimer.Stop();appearancePopup.Close();Hide();
-            try{if(!await agentPanel.ShutdownAsync()){closing=false;Show();if(Session.Documents.Count==0)NewDocument(true);return;}await previewClose;await preview.CloseAsync();}catch(Exception error){Show();MessageBox.Show(this,error.Message,"预览清理提示",MessageBoxButton.OK,MessageBoxImage.Warning);}
+            try{await terminalPanel.ShutdownAsync();await previewClose;await preview.CloseAsync();}catch(Exception error){Show();MessageBox.Show(this,error.Message,"预览清理提示",MessageBoxButton.OK,MessageBoxImage.Warning);}
             try{Appearance.Save(preferencesPath);}catch(Exception){/* Optional appearance settings cannot prevent exit. */}
             buffers.Clear();copiedVersions.Clear();ClearWorkspace();Close();
         }
