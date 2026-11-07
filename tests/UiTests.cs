@@ -53,6 +53,8 @@ namespace Qingye.Tests
             catch(Exception error){for(int i=0;error!=null && i<6;i++,error=error.InnerException){Console.WriteLine(error.GetType().FullName+": "+error.Message);Console.WriteLine(error.StackTrace);}return 1;}
             try
             {
+                Test("Unused rich editing and second text editor stay unloaded",delegate{Check(!window.richEdit.IsCreated&&!window.secondary.IsEditorCreated,"Startup created unused editors");window.SetTheme("warm");Check(!window.richEdit.IsCreated&&!window.secondary.IsEditorCreated,"Theme change initialized unused editors");window.SetTheme("mint");});
+                Test("Caret status reuses header controls and preserves explicit notices",delegate{var icon=window.TestHooks.DocumentBar.FileIcon;for(int i=0;i<100;i++)window.UpdateStatus();Check(Object.ReferenceEquals(icon,window.TestHooks.DocumentBar.FileIcon),"Caret updates rebuilt the file icon");window.TestHooks.Activate(window.TestHooks.Primary);window.SetNotice("PERFORMANCE_NOTICE");Pump();Check(window.TestHooks.Footer.notice.Text=="PERFORMANCE_NOTICE","Queued status erased an explicit notice");window.UpdateStatus();});
                 Test("Startup is an editable blank document",delegate{Check(Editor()!=null && !Editor().IsReadOnly && Editor().Text=="" && window.Session.Documents.Count==1,"Startup needs selection or lacks editor");});
                 Test("Quick open includes unsaved documents and shows empty results",delegate{
                     Exception failure=null;
@@ -318,6 +320,81 @@ namespace Qingye.Tests
                     var pane=new PreviewPane();window.Content=new Grid{Children={pane}};Pump();string file=Path.Combine(root,"export.pdf");
                     try{Await(pane.SaveHtmlAsPdfAsync("<html><body><h1>PDF 导出</h1></body></html>",file));Check(File.Exists(file) && new FileInfo(file).Length>100,"PDF export produced no file");Check(System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(file).Take(5).ToArray())=="%PDF-","PDF header missing");}finally{Await(pane.CloseAsync());}
                 });
+                Test("Print moves source views to reading and explains non-printable files",delegate{
+                    foreach(var doc in window.Session.Documents){doc.Modified=false;doc.MetadataModified=false;}
+                    string md=Path.Combine(root,"print-guide.md");File.WriteAllText(md,"# 打印\n\n正文段落");
+                    Await(window.OpenPathsAsync(new[]{md},false));window.SetViewMode("single");Pump();
+                    var prepared=window.PreparePrintAsync();Await(prepared);
+                    Check(prepared.Result && window.Appearance.Layout=="reader","Print did not move the source view to a printable reading view");
+                    var bitmap=System.Windows.Media.Imaging.BitmapSource.Create(2,2,96,96,System.Windows.Media.PixelFormats.Bgra32,null,new byte[16],8);var png=new System.Windows.Media.Imaging.PngBitmapEncoder();png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));string image=Path.Combine(root,"print-image.png");using(var file=File.Create(image))png.Save(file);
+                    Await(window.OpenPathsAsync(new[]{image},false));Pump();
+                    var rejected=window.PreparePrintAsync();Await(rejected);
+                    Check(!rejected.Result,"Non-printable content was treated as printable");
+                    Check(window.TestHooks.Footer.notice.Text.Contains("没有可打印内容"),"Non-printable content produced no visible explanation");
+                });
+                Test("Markdown HTML is announced instead of silently escaped",delegate{
+                    var content=Qingye.UI.NativeMarkdown.Parse("# 标题\n\n<div align=\"center\">块</div>\n\n正文");
+                    Check(Qingye.UI.NativeMarkdown.HasHtmlBlocks(content.Source),"HTML block was not detected");
+                    var viewer=Qingye.UI.NativeMarkdown.Create(content,null,null);
+                    string text=new System.Windows.Documents.TextRange(viewer.Document.ContentStart,viewer.Document.ContentEnd).Text;
+                    Check(text.Contains("网页代码") && text.Contains("纯文本显示"),"Rendered markdown has no HTML explanation");
+                    var fenced=Qingye.UI.NativeMarkdown.Parse("# 标题\n\n```\n<div>示例代码</div>\n```");
+                    Check(!Qingye.UI.NativeMarkdown.HasHtmlBlocks(fenced.Source),"Fenced code was misreported as an HTML block");
+                    string output=Path.GetFullPath(Path.Combine(root,"..","..","..","artifacts","ui"));Directory.CreateDirectory(output);
+                    var host=new Grid{Children={Qingye.UI.NativeMarkdown.Create(Qingye.UI.NativeMarkdown.Parse("# 带网页代码的文档\n\n正常段落。\n\n<div align=\"center\">块内容</div>\n\n## 小节\n\n- 条目"),null,null)}};
+                    var previewWindow=new Window{ShowActivated=false,Left=-16000,Top=0,Width=900,Height=700,Content=host};previewWindow.Show();Pump();
+                    try{CaptureElement(host,Path.Combine(output,"0.15-markdown-html-notice.png"));}finally{previewWindow.Close();Pump();}
+                });
+                Test("View button accessible names follow their visible labels",delegate{
+                    foreach(var doc in window.Session.Documents){doc.Modified=false;doc.MetadataModified=false;}
+                    string csv=Path.Combine(root,"accessible.csv");File.WriteAllText(csv,"a,b\r\n1,2");
+                    Await(window.OpenPathsAsync(new[]{csv},false));Pump();
+                    Check((string)window.TestHooks.DocumentBar.readViewButton.Content=="表格","CSV reader label missing");
+                    Check(System.Windows.Automation.AutomationProperties.GetName(window.TestHooks.DocumentBar.readViewButton)=="表格","Table button exposes a stale accessible name");
+                    Check(System.Windows.Automation.AutomationProperties.GetName(window.TestHooks.DocumentBar.sourceViewButton)==(string)window.TestHooks.DocumentBar.sourceViewButton.Content,"Source button accessible name does not match its label");
+                });
+                Test("Wheel scrolling is proportional and accelerates during a spin",delegate{
+                    foreach(var doc in window.Session.Documents){doc.Modified=false;doc.MetadataModified=false;}
+                    string file=Path.Combine(root,"wheel.txt");var sb=new System.Text.StringBuilder();for(int i=0;i<2000;i++)sb.Append("wheel line ").Append(i).Append('\n');File.WriteAllText(file,sb.ToString());
+                    Await(window.OpenPathsAsync(new[]{file},false));window.SetViewMode("single");Pump();
+                    var editor=window.ActiveEditor;editor.ScrollToVerticalOffset(1000);Pump();
+                    double start=editor.VerticalOffset;
+                    RaiseWheel(editor.TextArea,-120);Pump();
+                    double one=editor.VerticalOffset-start;
+                    Check(one>40 && one<120,"A wheel notch no longer moves a few lines");
+                    editor.ScrollToVerticalOffset(1000);Pump();start=editor.VerticalOffset;
+                    for(int i=0;i<4;i++)RaiseWheel(editor.TextArea,-120);
+                    Pump();
+                    Check(editor.VerticalOffset-start>one*1.5,"Fast spinning does not cover more ground per notch");
+                    editor.ScrollToVerticalOffset(1000);Pump();double before=editor.VerticalOffset;
+                    RaiseWheel(editor.TextArea,-30);Pump();
+                    Check(editor.VerticalOffset>before+5,"High-resolution wheel deltas are dropped instead of accumulated");
+                });
+                Test("Reading view uses the same proportional wheel handling",delegate{
+                    var sb=new System.Text.StringBuilder();for(int i=0;i<400;i++)sb.Append("## 小节 ").Append(i).Append("\n\n这一节用来验证阅读视图的滚轮距离，内容重复以便形成足够的滚动范围。\n\n");
+                    var viewer=Qingye.UI.NativeMarkdown.Create(Qingye.UI.NativeMarkdown.Parse(sb.ToString()),null,null);
+                    var host=new Grid{Children={viewer}};
+                    var probeWindow=new Window{ShowActivated=false,Left=-16000,Top=0,Width=900,Height=700,Content=host};probeWindow.Show();
+                    try
+                    {
+                        probeWindow.UpdateLayout();Pump();
+                        var scroll=FindChild<ScrollViewer>(viewer);
+                        Check(scroll!=null,"Reading viewer has no scroll surface");
+                        Check(scroll.ScrollableHeight>200,"Reading view is not scrollable: "+scroll.ScrollableHeight);
+                        scroll.ScrollToVerticalOffset(0);Pump();
+                        double start=scroll.VerticalOffset;
+                        RaiseWheel(viewer,-120);Pump();
+                        double one=scroll.VerticalOffset-start;
+                        Check(one>40,"Reading view wheel scroll is too small: "+one);
+                        scroll.ScrollToVerticalOffset(0);Pump();start=scroll.VerticalOffset;
+                        for(int i=0;i<4;i++)RaiseWheel(viewer,-120);
+                        Pump();
+                        Check(scroll.VerticalOffset-start>one*1.5,"Reading view ignores fast wheel spinning");
+                    }
+                    finally{probeWindow.Close();Pump();}
+                });
+                RunEditorConvenienceTests(window,root);
+                RunZoomAndColorTests(window,root);
             }
             finally
             {
@@ -326,9 +403,171 @@ namespace Qingye.Tests
             }
             Console.WriteLine("UI: "+passed+" passed, "+failed+" failed");return failed==0?0:1;
         }
+        // 0.16.0 code-editing conveniences: sentence-level document/control tests
+        // for indentation, pairs, comment toggling and line operations.
+        static void RunEditorConvenienceTests(MainWindow window,string root)
+        {
+            Test("Python indentation follows blocks and dedents keywords",delegate{
+                var editor=CreateCodeEditor("def f():\n",".py");
+                editor.Document.Insert(editor.Document.TextLength,"x");
+                ApplyIndent(editor,2);
+                Check(editor.Document.Text=="def f():\n    x","Python block did not open with four spaces: "+editor.Document.Text);
+                editor.Document.Text="if x:\n    pass\nelse:";
+                ApplyIndent(editor,3);
+                Check(editor.Document.Text=="if x:\n    pass\nelse:","else was indented instead of aligned with its block: "+editor.Document.Text);
+                editor.Document.Text="if x:\n    pass\n        else:";
+                ApplyIndent(editor,3);
+                Check(editor.Document.Text=="if x:\n    pass\nelse:","else did not dedent one level: "+editor.Document.Text);
+            });
+            Test("Language profiles choose tab and indentation conventions",delegate{
+                var editor=CreateCodeEditor("","");
+                CodeEditing.Configure(editor,".py");
+                Check(editor.Options.ConvertTabsToSpaces && editor.Options.IndentationSize==4,"Python should type spaces with four-column indentation");
+                Check(editor.TextArea.IndentationStrategy!=null,"Python indentation strategy missing");
+                CodeEditing.Configure(editor,".cs");
+                Check(editor.Options.ConvertTabsToSpaces,"Brace languages should use spaces");
+                CodeEditing.Configure(editor,".bat");
+                Check(!editor.Options.ConvertTabsToSpaces,"Batch files should keep tabs");
+                CodeEditing.Configure(editor,".mk");
+                Check(!editor.Options.ConvertTabsToSpaces,"Makefiles should keep tabs");
+                CodeEditing.Configure(editor,".txt");
+                Check(editor.TextArea.IndentationStrategy!=null,"Plain text should keep a default indentation strategy");
+            });
+            Test("Brace language indentation copies columns and opens blocks",delegate{
+                var editor=CreateCodeEditor("class A {\n",".cs");
+                ApplyIndent(editor,2);
+                Check(editor.Document.Text=="class A {\n    ","An opening brace did not add one indentation level: "+editor.Document.Text);
+                editor.Document.Text="    foo();\nbar";
+                ApplyIndent(editor,2);
+                Check(editor.Document.Text=="    foo();\n    bar","Brace language did not copy the previous indentation: "+editor.Document.Text);
+            });
+            Test("Indent and unindent selected lines undo in one step",delegate{
+                var editor=CreateCodeEditor("alpha\nbeta\n",".py");
+                editor.Select(0,10);
+                CodeEditing.IndentLines(editor,false);
+                Check(editor.Document.Text=="    alpha\n    beta\n","Selected lines were not indented: "+editor.Document.Text);
+                editor.Document.UndoStack.Undo();
+                Check(editor.Document.Text=="alpha\nbeta\n","One undo did not restore the indented block");
+                var unindented=CreateCodeEditor("    alpha\n    beta\n",".py");
+                unindented.Select(0,18);
+                CodeEditing.IndentLines(unindented,true);
+                Check(unindented.Document.Text=="alpha\nbeta\n","Selected lines were not unindented: "+unindented.Document.Text);
+            });
+            Test("Duplicate and move lines keep text and caret",delegate{
+                var editor=CreateCodeEditor("one\ntwo\n",".py");
+                editor.CaretOffset=5;
+                CodeEditing.DuplicateLine(editor);
+                Check(editor.Document.Text=="one\ntwo\ntwo\n","Duplicate line did not copy below: "+editor.Document.Text);
+                Check(editor.SelectedText=="two","Duplicate line did not select the copied text");
+                editor.Document.UndoStack.Undo();
+                Check(editor.Document.Text=="one\ntwo\n","Duplicate line needs one undo step");
+                editor.Select(5,0);
+                CodeEditing.MoveLines(editor,-1);
+                Check(editor.Document.Text=="two\none\n","Move up did not swap the lines: "+editor.Document.Text);
+                Check(editor.CaretOffset==1,"Move up lost the caret column: "+editor.CaretOffset);
+                CodeEditing.MoveLines(editor,1);
+                Check(editor.Document.Text=="one\ntwo\n","Move down did not restore the order: "+editor.Document.Text);
+                Check(editor.CaretOffset==5,"Move down lost the caret column: "+editor.CaretOffset);
+                CodeEditing.MoveLines(editor,-1);
+                CodeEditing.MoveLines(editor,-1);
+                Check(editor.Document.Text=="two\none\n","Moving above the first line changed nothing instead of stopping");
+            });
+            Test("Line comments toggle on Python and stay inert for Markdown",delegate{
+                var editor=CreateCodeEditor("x = 1\ny = 2\n",".py");
+                editor.Select(0,12);
+                CodeEditing.ToggleComment(editor);
+                Check(editor.Document.Text=="# x = 1\n# y = 2\n","Python lines were not commented: "+editor.Document.Text);
+                CodeEditing.ToggleComment(editor);
+                Check(editor.Document.Text=="x = 1\ny = 2\n","Second toggle did not remove the comment prefix: "+editor.Document.Text);
+                editor.Document.UndoStack.Undo();
+                Check(editor.Document.Text=="# x = 1\n# y = 2\n","Comment toggle should undo as one step per toggle");
+                var prose=CreateCodeEditor("plain text",".md");
+                prose.Select(0,10);
+                CodeEditing.ToggleComment(prose);
+                Check(prose.Document.Text=="plain text","Markdown source must not gain a line comment");
+            });
+            Test("HTML comment toggle wraps and unwraps selections and lines",delegate{
+                var editor=CreateCodeEditor("<div>x</div>",".html");
+                editor.Select(0,12);
+                CodeEditing.ToggleComment(editor);
+                Check(editor.Document.Text=="<!--<div>x</div>-->","HTML selection was not wrapped: "+editor.Document.Text);
+                Check(editor.SelectedText=="<div>x</div>","Wrapped HTML selection was not kept on the content");
+                CodeEditing.ToggleComment(editor);
+                Check(editor.Document.Text=="<div>x</div>","Second HTML toggle did not remove the wrapper: "+editor.Document.Text);
+                editor.CaretOffset=5;
+                CodeEditing.ToggleComment(editor);
+                Check(editor.Document.Text=="<!--<div>x</div>-->","HTML line was not wrapped: "+editor.Document.Text);
+                CodeEditing.ToggleComment(editor);
+                Check(editor.Document.Text=="<div>x</div>","HTML line wrapper was not removed: "+editor.Document.Text);
+            });
+            Test("Auto pairs insert, wrap selections and skip closing characters",delegate{
+                var editor=CreateCodeEditor("",".py");
+                Check(CodeEditing.CompletePair(editor,"("),"Opening bracket was not handled");
+                Check(editor.Document.Text=="()","Opening bracket did not insert its pair: "+editor.Document.Text);
+                Check(editor.CaretOffset==1,"Caret is not between the inserted pair");
+                Check(CodeEditing.CompletePair(editor,")"),"Typed closing bracket was not handled");
+                Check(editor.Document.Text=="()" && editor.CaretOffset==2,"Typed closing bracket duplicated or did not move the caret");
+                editor.Document.Text="abc";
+                editor.Select(0,3);
+                Check(CodeEditing.CompletePair(editor,"("),"Opening bracket around a selection was not handled");
+                Check(editor.Document.Text=="(abc)","Selection was not wrapped: "+editor.Document.Text);
+                Check(editor.SelectedText=="abc","Wrapped selection was not kept on the content");
+                var prose=CreateCodeEditor("",".md");
+                Check(!CodeEditing.CompletePair(prose,"("),"Markdown should not auto-pair");
+                Check(prose.Document.Text=="","Markdown document was modified by pairing");
+            });
+            Test("Auto pairs handle quotes without duplicate closers",delegate{
+                var editor=CreateCodeEditor("",".py");
+                Check(CodeEditing.CompletePair(editor,"\""),"Double quote was not paired");
+                Check(editor.Document.Text=="\"\"" && editor.CaretOffset==1,"Double quote pair is wrong: "+editor.Document.Text);
+                editor.Document.Text="\"\"";
+                editor.CaretOffset=1;
+                Check(CodeEditing.CompletePair(editor,"\""),"Typing over an existing closing quote was not handled");
+                Check(editor.Document.Text=="\"\"" && editor.CaretOffset==2,"Typed quote duplicated or did not move the caret");
+                Check(CodeEditing.CompletePair(editor,"'"),"Single quote was not paired");
+                Check(editor.Document.Text=="\"\"''","Single quote pair was not inserted: "+editor.Document.Text);
+                Check(!CodeEditing.CompletePair(editor,")"),"A closing bracket with no matching next character should fall through");
+            });
+            Test("Editor text input wires pairs once and respects prose documents",delegate{
+                var editor=new TextEditor();
+                editor.Document=new ICSharpCode.AvalonEdit.Document.TextDocument("");
+                CodeEditing.Attach(editor);
+                CodeEditing.Attach(editor);
+                CodeEditing.Configure(editor,".py");
+                CodeEditing.Configure(editor,".py");
+                editor.TextArea.PerformTextInput("(");
+                Check(editor.Document.Text=="()","TextEntering pairing did not run through typed input: "+editor.Document.Text);
+                Check(editor.CaretOffset==1,"Typed pair put the caret in the wrong place");
+                editor.TextArea.PerformTextInput("abc");
+                Check(editor.Document.Text=="(abc)","Typed content did not land inside the pair: "+editor.Document.Text);
+                editor.TextArea.PerformTextInput(")");
+                Check(editor.Document.Text=="(abc)" && editor.CaretOffset==5,"Typed closing bracket duplicated through input: "+editor.Document.Text);
+                var prose=new TextEditor();
+                prose.Document=new ICSharpCode.AvalonEdit.Document.TextDocument("");
+                CodeEditing.Attach(prose);
+                CodeEditing.Configure(prose,".md");
+                prose.TextArea.PerformTextInput("(");
+                Check(prose.Document.Text=="(","Prose documents should receive plain text input");
+            });
+        }
+        static TextEditor CreateCodeEditor(string text,string extension)
+        {
+            var editor=new TextEditor();
+            editor.Document=new ICSharpCode.AvalonEdit.Document.TextDocument(text);
+            CodeEditing.Attach(editor);
+            CodeEditing.Configure(editor,extension);
+            return editor;
+        }
+        static void ApplyIndent(TextEditor editor,int lineNumber)
+        {
+            var strategy=editor.TextArea.IndentationStrategy;
+            Check(strategy!=null,"No indentation strategy configured");
+            strategy.IndentLine(editor.Document,editor.Document.GetLineByNumber(lineNumber));
+        }
         [StructLayout(LayoutKind.Sequential)] struct ProcessBasicInfo { public IntPtr Reserved1,Peb,Reserved2,Reserved3,Pid,Parent; }
         static void CheckBrowser(PreviewPane pane){Check(pane.Browser!=null && pane.Browser.CoreWebView2!=null,"Preview engine not created: "+String.Join(" | ",Walk(pane).OfType<TextBlock>().Select(t=>t.Text)));}
         static T FindChild<T>(DependencyObject parent) where T:DependencyObject{if(parent==null)return null;if(parent is T)return (T)parent;for(int i=0;i<System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);i++){var found=FindChild<T>(System.Windows.Media.VisualTreeHelper.GetChild(parent,i));if(found!=null)return found;}return null;}
+        static void RaiseWheel(UIElement target,int delta){var args=new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount,delta);args.RoutedEvent=UIElement.PreviewMouseWheelEvent;target.RaiseEvent(args);}
         static System.Collections.Generic.IEnumerable<DependencyObject> Walk(DependencyObject parent){yield return parent;for(int i=0;i<System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);i++)foreach(var child in Walk(System.Windows.Media.VisualTreeHelper.GetChild(parent,i)))yield return child;}
         static Rect Bounds(FrameworkElement element,System.Windows.Media.Visual ancestor){return element.TransformToAncestor(ancestor).TransformBounds(new Rect(0,0,element.ActualWidth,element.ActualHeight));}
         static void CreateEpub(string path)

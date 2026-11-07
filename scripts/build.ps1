@@ -53,7 +53,10 @@ $iconResources = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot 'src/Asset
 Compile (@('/target:winexe','/platform:x64','/main:Qingye.Program',('/out:' + (Join-Path $outputRoot '轻页.exe')),('/win32icon:' + $applicationIcon),('/resource:' + $applicationIcon + ',Qingye.Application.ico')) + $appReferences + $appSources + $iconResources + $terminalResources)
 Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot '轻页.exe.config') -Force
 if (Test-Path -LiteralPath (Join-Path $projectRoot 'tests/UiTests.cs')) {
-    Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.UiTests',('/out:' + (Join-Path $outputRoot 'UiTests.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/UiTests.cs'))
+    $uiTestSources = @(Join-Path $projectRoot 'tests/UiTests.cs')
+    $uiTestZoom = Join-Path $projectRoot 'tests/UiTests.Zoom.cs'
+    if (Test-Path -LiteralPath $uiTestZoom) { $uiTestSources += $uiTestZoom }
+    Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.UiTests',('/out:' + (Join-Path $outputRoot 'UiTests.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + $uiTestSources)
     Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'UiTests.exe.config') -Force
 }
 Write-Output "Build ready: $outputRoot"
@@ -67,3 +70,12 @@ Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.DesktopExperience',
 Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'ExperienceHarness.exe.config') -Force
 
 Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.TerminalProbe',('/out:' + (Join-Path $outputRoot 'TerminalProbe.exe'))) + $references + (Join-Path $projectRoot 'tests/TerminalProbe.cs'))
+
+Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.UsabilityTests',('/out:' + (Join-Path $outputRoot 'UsabilityTests.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/UsabilityTests.cs'))
+Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'UsabilityTests.exe.config') -Force
+
+Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.PerformanceProbe',('/out:' + (Join-Path $outputRoot 'PerformanceProbe.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/PerformanceProbe.cs'))
+Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'PerformanceProbe.exe.config') -Force
+
+Compile (@('/target:exe','/platform:x64','/main:Qingye.Tests.ScrollProbe',('/out:' + (Join-Path $outputRoot 'ScrollProbe.exe')),('/r:' + (Join-Path $outputRoot '轻页.exe'))) + $appReferences + (Join-Path $projectRoot 'tests/ScrollProbe.cs'))
+Copy-Item -LiteralPath (Join-Path $projectRoot 'src/App.config') -Destination (Join-Path $outputRoot 'ScrollProbe.exe.config') -Force

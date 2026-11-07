@@ -106,7 +106,7 @@ namespace Qingye.UI
             breadcrumb.Text=(owner.WorkspaceRoot==null?"本次阅读":Path.GetFileName(owner.WorkspaceRoot))+"  ›  "+doc.Title;
             encodingButton.Content=doc.EncodingName.ToUpperInvariant()+(doc.HasBom?" BOM":"");
             newlineButton.Content=doc.NewLine=="\n"?"LF":doc.NewLine=="\r"?"CR":"CRLF";
-            position.Text=owner.Appearance.Layout=="reader"?(doc.IsReadOnly?"只读查看":"阅读视图 · 切换源码可编辑"):owner.Appearance.Layout=="wysiwyg"?(doc.IsReadOnly?"只读查看":"原位编辑 · 保存时按支持的 Markdown 子集整理格式"):"行 "+active.Editor.TextArea.Caret.Line+"，列 "+active.Editor.TextArea.Caret.Column+" · "+(active.Editor.Document==null?0:active.Editor.Document.TextLength)+" 字符"+(active.Editor.SelectionLength>0?" · 选中 "+active.Editor.SelectionLength:"")+(doc.IsReadOnly?" · 只读":"");
+            position.Text=owner.Appearance.Layout=="reader"?(doc.IsReadOnly?"只读查看":"阅读视图 · 切换源码可编辑"):owner.Appearance.Layout=="wysiwyg"?(doc.IsReadOnly?"只读查看":"原位编辑 · 保存时按支持的 Markdown 子集整理格式"):"行 "+active.Editor.TextArea.Caret.Line+"，列 "+active.Editor.TextArea.Caret.Column+" · "+(active.Editor.Document==null?0:active.Editor.Document.TextLength)+" 字符"+(active.Editor.SelectionLength>0?" · 选中 "+active.Editor.SelectionLength:"")+(doc.IsReadOnly?" · 只读":"")+(owner.TextZoom!=1?" · 缩放 "+Math.Round(owner.TextZoom*100)+"%":"");
             owner.SaveButton.IsEnabled=!doc.IsReadOnly;
             bool textFile=doc.Kind==DocumentKind.Text || doc.Kind==DocumentKind.PagedText;
             encodingButton.Visibility=newlineButton.Visibility=textFile?Visibility.Visible:Visibility.Collapsed;

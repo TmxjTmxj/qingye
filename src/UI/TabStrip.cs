@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -120,6 +120,9 @@ namespace Qingye.UI
                 }
                 ));
                 menu.Items.Add(new Separator());
+                menu.Items.Add(Theme.Menu("复制完整路径",()=>{if(doc.Path!=null)Clipboard.SetText(doc.Path);}));
+                menu.Items.Add(Theme.Menu("复制相对工作区路径",()=>{if(doc.Path!=null){string root=owner.WorkspaceRoot;Clipboard.SetText(root!=null&&FileService.IsInsideRoot(root,doc.Path)?doc.Path.Substring(root.TrimEnd('\\','/').Length+1):Path.GetFileName(doc.Path));}}));
+                menu.Items.Add(Theme.Menu("重新打开刚关闭的文件  Ctrl+Shift+T",()=>owner.Observe(owner.Usage.ReopenAsync())));
                 menu.Items.Add(Theme.Menu("在资源管理器中定位",delegate
                 {
                     if(doc.Path!=null && File.Exists(doc.Path))Process.Start("explorer.exe","/select,\""+doc.Path+"\"");

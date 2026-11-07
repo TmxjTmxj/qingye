@@ -34,7 +34,7 @@ foreach ($group in @(@('*.png','ui'),@('*.txt','metrics'))) {
 $packageRoot = Assert-ProjectPath (Join-Path $projectRoot 'build/packages')
 Get-ChildItem -LiteralPath $packageRoot -File -Filter '*.nupkg' | ForEach-Object { $target=Assert-ProjectPath $_.FullName; Remove-Item -LiteralPath $target }
 $binRoot = Assert-ProjectPath (Join-Path $projectRoot 'build/bin')
-foreach ($item in Get-ChildItem -LiteralPath $binRoot -File | Where-Object { $_.Name.StartsWith('杞婚〉') }) { $target=Assert-ProjectPath $item.FullName; Remove-Item -LiteralPath $target }
+foreach ($item in Get-ChildItem -LiteralPath $binRoot -File | Where-Object { $_.Name.StartsWith('轻页') }) { $target=Assert-ProjectPath $item.FullName; Remove-Item -LiteralPath $target }
 foreach ($item in Get-ChildItem -LiteralPath $binRoot -Directory | Where-Object { $_.Name -match '^(picker|ui|test)-data-[0-9a-f]{32}$' }) { $target=Assert-ContainedTree $projectRoot $item.FullName; Remove-Item -LiteralPath $target -Recurse -Force }
 $launch = Assert-ProjectPath (Join-Path $projectRoot '启动轻页.cmd')
 [IO.File]::WriteAllText($launch, "@echo off`r`nchcp 65001 >nul`r`nstart `"`" `"%~dp0app\轻页.exe`"`r`n", (New-Object Text.UTF8Encoding($false)))

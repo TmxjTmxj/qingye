@@ -69,7 +69,7 @@ namespace Qingye.UI
         public int ReplaceAll(string text,string value,bool useRegex,bool matchCase){return search.ReplaceAll(text,value,useRegex,matchCase);}
         internal void ShowGoToLine(){search.ShowGoToLine();}
         public void ImportWorkspace(string path){workspace.ImportWorkspace(path);sidePanel.Reveal();sidePanel.SetMode(false);sidePanel.RefreshFiles();footer.sessionHint.Text="临时工作区 · 退出即清空";UpdateToolbar();}
-        internal void ClearWorkspace(){workspace.ClearWorkspace();footer.sessionHint.Text="本次阅读 · 不保留文件列表";sidePanel.RefreshFiles();UpdateToolbar();}
+        internal void ClearWorkspace(){workspace.ClearWorkspace();UpdateUsageHint();sidePanel.RefreshFiles();UpdateToolbar();}
         public MainWindow()
         {
             Session=new DocumentSession();Appearance=Settings.Load(preferencesPath);Appearance.Layout="single";
@@ -90,16 +90,17 @@ namespace Qingye.UI
             Grid.SetRow(shellWork,4);root.Children.Add(shellWork);shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition());shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(0)});shellWork.Children.Add(sidePanel);Grid.SetColumn(layoutHost,2);shellWork.Children.Add(layoutHost);shellWork.Children.Add(terminalPanel);Grid.SetColumn(terminalPanel,4);
             terminalSplitter=new GridSplitter{HorizontalAlignment=HorizontalAlignment.Stretch,VerticalAlignment=VerticalAlignment.Stretch,ResizeDirection=GridResizeDirection.Columns,ResizeBehavior=GridResizeBehavior.PreviousAndNext,ShowsPreview=false};terminalSplitter.SetResourceReference(Control.BackgroundProperty,"LineBrush");Grid.SetColumn(terminalSplitter,3);shellWork.Children.Add(terminalSplitter);terminalSplitter.DragCompleted+=delegate{Appearance.TerminalSize=Math.Max(140,Math.Min(620,terminalDock.Right?terminalPanel.ActualWidth:terminalPanel.ActualHeight));};
             terminalDock=new TerminalDockLayout(shellWork,layoutHost,sidePanel,terminalPanel,terminalSplitter);
-            primary=new EditorPane("primary",buffers,OnBufferChanged,Placement);secondary=new EditorPane("secondary",buffers,OnBufferChanged,Placement);active=primary;
-            RegisterName("PrimaryEditor",primary.Editor);RegisterName("SecondaryEditor",secondary.Editor);primary.Activated+=ActivatePane;secondary.Activated+=ActivatePane;
-            preview=new PreviewPane();preview.PlaceRequested+=Placement;preview.OpenFileRequested+=path=>Observe(OpenPathsAsync(new[]{path},true));
+            primary=new EditorPane("primary",buffers,OnBufferChanged,Placement);secondary=new EditorPane("secondary",buffers,OnBufferChanged,Placement,true);active=primary;
+            RegisterName("PrimaryEditor",primary.Editor);secondary.EditorCreated+=delegate{RegisterName("SecondaryEditor",secondary.Editor);};primary.Activated+=ActivatePane;secondary.Activated+=ActivatePane;primary.ZoomRequested+=AdjustTextZoom;secondary.ZoomRequested+=AdjustTextZoom;
+            preview=new PreviewPane();preview.PlaceRequested+=Placement;preview.OpenFileRequested+=path=>Observe(OpenPathsAsync(new[]{path},true));preview.ZoomChanged+=delegate(int percent){SetNotice("阅读缩放 "+percent+"%");};
             richEdit=new RichEditSession(this);
             openRequests=new DocumentOpenHandler(this);saver=new DocumentSaver(this);exports=new ExportController(this);
+            InitializeUsage();
             openQueue=new BoundedOpenQueue(()=>!busy&&!closing,()=>{openQueueNotice="打开请求最多排队 4 个，已取消最早等待的请求。";SetNotice(openQueueNotice);},error=>SetNotice("无法打开："+error.Message));
             refreshTimer.Interval=TimeSpan.FromMilliseconds(300);refreshTimer.Tick+=async delegate{refreshTimer.Stop();await UpdatePreviewAsync();};
             AllowDrop=true;PreviewDragOver+=OnDragOver;PreviewDrop+=OnDrop;PreviewKeyDown+=(sender,args)=>WindowShortcuts.Handle(this,args);Closing+=OnClosing;
             SizeChanged+=delegate{bool small=ActualWidth<720;if(small!=narrowLayout){narrowLayout=small;if(showSecondary||showPreview&&Appearance.Layout!="reader")ApplyLayout(Appearance.Layout,!showSecondary);}UpdateToolbar();};
-            Loaded+=delegate{primary.Editor.Focus();UpdateStatus();};Activated+=delegate{CheckExternalFiles();};
+            Loaded+=delegate{primary.Editor.Focus();UpdateStatus();Usage.Startup();};Activated+=delegate{CheckExternalFiles();if(Usage!=null)Usage.RefreshOptions();};
             TestHooks=new WindowTestHooks(this,toolbar,documentBar,footer,tabStrip,appearancePopup,workspace,search,sidePanel,terminalPanel);
             NewDocument(true);SetLayout("single");
         }
@@ -111,7 +112,7 @@ namespace Qingye.UI
         }
 
         public Document Current {get{return active==null?null:active.BoundDocument;}}
-        internal void ActivatePane(EditorPane pane){active=pane;UpdateStatus();}
+        internal void ActivatePane(EditorPane pane){if(active!=pane){active=pane;UpdateStatus();}else QueueFooterStatus();}
         internal void Observe(Task task){task.ContinueWith(t=>Dispatcher.BeginInvoke(new Action(delegate{SetNotice(t.Exception.GetBaseException().Message);})),TaskContinuationOptions.OnlyOnFaulted);}
         public Task OpenPathsAsync(string[] paths,bool append)
         {
@@ -144,9 +145,9 @@ namespace Qingye.UI
         public bool SaveDocument(Document doc,bool saveAs){return saver.Save(doc,saveAs);}
         internal bool CloseDocuments(IEnumerable<Document> requested)
         {
-            var docs=requested.ToArray();if(richEdit.Active && docs.Contains(richEdit.Document))richEdit.Commit();
+            Usage.Capture();var docs=requested.ToArray();if(richEdit.Active && docs.Contains(richEdit.Document))richEdit.Commit();
             if(!Session.TryClose(docs,delegate(IList<Document> dirty){return Dialogs.ResolveClose(this,dirty,d=>SaveDocument(d,false));}))return false;
-            foreach(var doc in docs){if(primary.BoundDocument==doc)primary.Unbind();if(secondary.BoundDocument==doc)secondary.Unbind();buffers.Remove(doc);copiedVersions.Remove(doc);displayedDirty.Remove(doc);viewModes.Remove(doc);if(doc==richEdit.Document)richEdit.Detach(doc);}
+            Usage.Closed(docs);foreach(var doc in docs){if(primary.BoundDocument==doc)primary.Unbind();if(secondary.BoundDocument==doc)secondary.Unbind();buffers.Remove(doc);copiedVersions.Remove(doc);displayedDirty.Remove(doc);viewModes.Remove(doc);if(doc==richEdit.Document)richEdit.Detach(doc);}
             if(docs.Length>0){previewClose=preview.CloseAsync();Dispatcher.BeginInvoke(new Action(delegate{if(showPreview && !closing)Observe(UpdatePreviewAsync());}));}
             return true;
         }
@@ -158,27 +159,27 @@ namespace Qingye.UI
         }
         public void SelectDocument(Document doc,string pane)
         {
-            if(!Session.Documents.Contains(doc) || closing)return;
+            if(!Session.Documents.Contains(doc) || closing)return;Usage.Capture();
             if(richEdit.Active && doc!=richEdit.Document)richEdit.Leave();
             if(pane=="secondary"){if(!showSecondary)SetLayout(showPreview && Session.Documents.Count>1?"preview":"compare");active=secondary;}else if(pane=="primary" || !showSecondary)active=primary;
-            active.Bind(doc);active.Apply(Appearance);if(!showSecondary)ApplyLayout(DocumentView(doc),true);else if(doc.Kind==DocumentKind.Image || doc.Kind==DocumentKind.Pdf){primary.Bind(doc);active=primary;SetLayout("reader");}RefreshTabs();UpdateStatus();if(Appearance.Layout!="reader")active.Editor.Focus();if(showPreview)Observe(UpdatePreviewAsync());
+            active.Bind(doc);active.Apply(Appearance);Usage.Restore(doc);if(!showSecondary){string view=DocumentView(doc);if(view!=Appearance.Layout)ApplyLayout(view,true);}else if(doc.Kind==DocumentKind.Image || doc.Kind==DocumentKind.Pdf){primary.Bind(doc);active=primary;SetLayout("reader");}RefreshTabs();UpdateStatus();if(Appearance.Layout!="reader")active.Editor.Focus();if(showPreview)Observe(UpdatePreviewAsync());
         }
         internal void OnBufferChanged()
         {
-            if(primary==null)return;primary.UpdateTitle();secondary.UpdateTitle();UpdateStatus();
+            if(primary==null)return;primary.UpdateEmptyHint();secondary.UpdateEmptyHint();search.RefreshMatches(true);if(Usage!=null)Usage.Changed();if(sidePanel!=null)sidePanel.RequestOutlineRefresh();
             // Rebuild tabs only at the clean/dirty transition, not for every typed character.
-            if(Session.Documents.Any(d=>!displayedDirty.ContainsKey(d) || displayedDirty[d]!=d.IsDirty))RefreshTabs();
+            if(Session.Documents.Any(d=>!displayedDirty.ContainsKey(d) || displayedDirty[d]!=d.IsDirty)){RefreshTabs();UpdateStatus();}else QueueFooterStatus();
             if(showPreview){refreshTimer.Stop();refreshTimer.Start();}
         }
         internal void UpdateStatus()
         {
-            if(active==null||Current==null)return;var doc=Current;
-            Title=doc.Title+(doc.IsDirty?" •":"")+" — 轻页";documentBar.Update(doc);footer.Update(doc,active,openQueueNotice);
+            CancelFooterStatus();if(active==null||Current==null)return;var doc=Current;
+            search.RefreshMatches();Title=doc.Title+(doc.IsDirty?" •":"")+" — 轻页";documentBar.Update(doc);footer.Update(doc,active,openQueueNotice);
             if(sidePanel!=null)sidePanel.RequestOutlineRefresh();
         }
-        internal void SetNotice(string message){footer.SetNotice(message);}
+        internal void SetNotice(string message){CancelFooterStatus();footer.SetNotice(message);}
         public void SetTheme(string theme){Appearance.Theme=theme;Appearance.Accent="";ApplyAppearance();}
-        internal void ApplyAppearance(){Theme.Apply(this,Appearance);primary.Apply(Appearance);secondary.Apply(Appearance);richEdit.Editor.ApplyTheme(Appearance);RefreshTabs();if(terminalPanel!=null)terminalPanel.RefreshAppearance();}
+        internal void ApplyAppearance(){Theme.Apply(this,Appearance);primary.Apply(Appearance);secondary.Apply(Appearance);richEdit.ApplyTheme(Appearance);RefreshTabs();if(terminalPanel!=null)terminalPanel.RefreshAppearance();}
         public void SetLayout(string layout){ApplyLayout(layout,false);}
         internal void ApplyLayout(string layout,bool currentFileOnly)
         {
@@ -188,7 +189,8 @@ namespace Qingye.UI
             layoutHost.Apply(layout,showSecondary,showPreview,oldPreview);
         }
         internal void ToggleSidePanel(){sidePanel.Toggle();}
-        internal void PrintCurrent(){preview.Print(this);}
+        internal void PrintCurrent(){Observe(PrintCurrentAsync());}
+
         internal void ToggleTerminal(){terminalVisible=!terminalVisible;UpdateToolbar();if(terminalVisible)terminalPanel.Reveal();else active.Editor.Focus();}
         internal void NewWindow(){Process.Start(new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location){UseShellExecute=false});}
         internal void NavigateToOutline(OutlineItem item){sidePanel.Navigate(item);}
@@ -209,7 +211,7 @@ namespace Qingye.UI
                 if(known && previous.CompareAge(buffer.Version)==0)continue;
                 if(known || doc.Modified){var snapshot=buffer.CreateSnapshot();doc.SetTextSource(snapshot.TextLength,length=>snapshot.GetText(0,length));}copiedVersions[doc]=buffer.Version;
             }
-            await preview.ShowAsync(Current,Session.Documents.ToArray());
+            var target=Current;await preview.ShowAsync(target,Session.Documents.ToArray());if(Current==target)Usage.RestoreReader(target);
         }
         internal async Task ReloadEncodingAsync(string encoding)
         {
@@ -239,7 +241,7 @@ namespace Qingye.UI
         async void OnClosing(object sender,System.ComponentModel.CancelEventArgs e)
         {
             if(closing)return;e.Cancel=true;if(!CloseDocuments(Session.Documents.ToArray()))return;closing=true;openQueue.CancelWaiting();refreshTimer.Stop();appearancePopup.Close();Hide();
-            try{await terminalPanel.ShutdownAsync();await previewClose;await preview.CloseAsync();}catch(Exception error){Show();MessageBox.Show(this,error.Message,"预览清理提示",MessageBoxButton.OK,MessageBoxImage.Warning);}
+            try{await Usage.ShutdownAsync();await terminalPanel.ShutdownAsync();await previewClose;await preview.CloseAsync();}catch(Exception error){Show();MessageBox.Show(this,error.Message,"预览清理提示",MessageBoxButton.OK,MessageBoxImage.Warning);}
             try{Appearance.Save(preferencesPath);}catch(Exception){/* Optional appearance settings cannot prevent exit. */}
             buffers.Clear();copiedVersions.Clear();ClearWorkspace();Close();
         }

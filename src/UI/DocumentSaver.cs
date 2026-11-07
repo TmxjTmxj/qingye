@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using ICSharpCode.AvalonEdit.Document;
 using Qingye.Core;
@@ -13,6 +13,7 @@ namespace Qingye.UI
 
         internal bool Save(Document doc, bool saveAs)
         {
+            owner.Usage.Capture();var beforeSave=owner.Usage.PositionOf(doc);
             if (owner.richEdit.IsEditing(doc)) owner.richEdit.Commit();
             if (doc.IsReadOnly)
             {
@@ -29,7 +30,7 @@ namespace Qingye.UI
                 if (buffer != null) buffer.UndoStack.MarkAsOriginalFile();
                 if (owner.primary.BoundDocument == doc) { owner.primary.Bind(doc); owner.primary.Apply(owner.Appearance); }
                 if (owner.secondary.BoundDocument == doc) { owner.secondary.Bind(doc); owner.secondary.Apply(owner.Appearance); }
-                owner.RefreshTabs(); owner.UpdateStatus(); owner.SetNotice("已保存"); return true;
+                owner.Usage.Saved(doc,beforeSave);owner.RefreshTabs(); owner.UpdateStatus(); owner.SetNotice("已保存"); return true;
             }
             catch (FileConflictException ex)
             {
@@ -40,7 +41,7 @@ namespace Qingye.UI
                 {
                     FileService.Save(doc, target, true);
                     if (buffer != null) buffer.UndoStack.MarkAsOriginalFile();
-                    owner.RefreshTabs(); owner.UpdateStatus(); return true;
+                    owner.Usage.Saved(doc,beforeSave);owner.RefreshTabs(); owner.UpdateStatus(); return true;
                 }
                 catch (Exception error) { owner.SetNotice("保存失败：" + error.Message); return false; }
             }

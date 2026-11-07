@@ -38,10 +38,19 @@ namespace Qingye.UI
             return new MarkdownContent{Tree=Markdown.Parse(text,pipeline),Source=text,Truncated=limited};
         }
 
+        static readonly System.Text.RegularExpressions.Regex htmlBlockLine=new System.Text.RegularExpressions.Regex(@"(?m)^ {0,3}</?[A-Za-z][A-Za-z0-9-]*(\s[^>\r\n]*)?>");
+        static readonly System.Text.RegularExpressions.Regex fencedBlock=new System.Text.RegularExpressions.Regex(@"(?ms)^[ \t]*(```|~~~)[^\r\n]*\r?\n.*?^[ \t]*\1[ \t]*\r?$");
+        public static bool HasHtmlBlocks(string text){if(String.IsNullOrEmpty(text))return false;return htmlBlockLine.IsMatch(fencedBlock.Replace(text,""));}
+
         public static FlowDocumentScrollViewer Create(MarkdownContent content,string path,Action<string> open)
         {
             var renderer=new NativeMarkdown(path,open){sourceText=content.Source};var flow=EmptyDocument();
             renderer.AddBlocks(content.Tree,flow.Blocks,0);
+            if(HasHtmlBlocks(content.Source))
+            {
+                var note=Theme.ContentToken(new W.Paragraph(new W.Run("此文件包含网页代码（HTML），为安全起见按纯文本显示；需要网页效果请用系统关联软件打开。")){FontSize=12},W.TextElement.ForegroundProperty,"MutedBrush");
+                if(flow.Blocks.FirstBlock!=null)flow.Blocks.InsertBefore(flow.Blocks.FirstBlock,note);else flow.Blocks.Add(note);
+            }
             if(content.Truncated || renderer.Truncated)flow.Blocks.Add(Theme.ContentToken(new W.Paragraph(new W.Run("阅读预览已限量显示；其余内容请在编辑区继续阅读。")){FontSize=12},W.TextElement.ForegroundProperty,"MutedBrush"));
             return Viewer(flow);
         }
@@ -52,7 +61,7 @@ namespace Qingye.UI
         public static FlowDocumentScrollViewer Viewer(W.FlowDocument flow)
         {
             var viewer=new FlowDocumentScrollViewer{Document=flow,IsToolBarVisible=false,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Background=Brushes.Transparent,BorderThickness=new Thickness(0),HorizontalAlignment=HorizontalAlignment.Stretch};
-            viewer.SizeChanged+=delegate{double inset=viewer.ActualWidth<480?16:24;flow.PagePadding=new Thickness(inset,24,inset,32);};return viewer;
+            viewer.SizeChanged+=delegate{double inset=viewer.ActualWidth<480?16:24;flow.PagePadding=new Thickness(inset,24,inset,32);};WheelScroll.Attach(viewer);return viewer;
         }
 
         void AddBlocks(ContainerBlock source,W.BlockCollection target,int depth)

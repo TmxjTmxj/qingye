@@ -26,6 +26,7 @@ namespace Qingye.UI
         }
         internal void NewBlank(bool append)
         {
+            if(owner.Usage!=null)owner.Usage.Capture();
             if(!append && !owner.CloseDocuments(owner.Session.Documents.ToArray()))return;
             if(!append)owner.ClearWorkspace();
             var doc=new Document();owner.Session.Open(doc,true);owner.primary.Bind(doc);owner.active=owner.primary;
@@ -69,7 +70,7 @@ namespace Qingye.UI
                     loaded.Add(doc);
                 }
                 if(owner.closing)return;
-                if(!append && !owner.CloseDocuments(owner.Session.Documents.ToArray()))return;
+                owner.Usage.Capture();if(!append && !owner.CloseDocuments(owner.Session.Documents.ToArray()))return;
                 if(!append)owner.ClearWorkspace();
                 else
                 {
@@ -99,6 +100,7 @@ namespace Qingye.UI
                     owner.primary.Apply(owner.Appearance);
                     owner.secondary.Apply(owner.Appearance);
                 }
+                foreach(var doc in loaded)owner.Usage.Opened(doc);
                 if(!append)owner.SetLayout("single");
                 owner.RefreshTabs();
                 owner.UpdateStatus();

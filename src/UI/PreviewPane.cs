@@ -22,6 +22,7 @@ namespace Qingye.UI
     {
         public event Action<string> PlaceRequested;
         public event Action<string> OpenFileRequested;
+        public event Action<int> ZoomChanged;
         public WebView2 Browser { get; private set; }
         public string ProfileDirectory { get; private set; }
         readonly Grid content=new Grid();
@@ -63,9 +64,13 @@ namespace Qingye.UI
             urlRow=new DockPanel{Margin=new Thickness(12,0,12,10)};Grid.SetRow(urlRow,1);root.Children.Add(urlRow);var go=Theme.Button("\uE8A7","连接",NavigateUrl);go.Padding=new Thickness(8,5,8,5);DockPanel.SetDock(go,Dock.Right);urlRow.Children.Add(go);urlRow.Children.Add(address);address.ToolTip="输入本机开发服务地址，例 http://localhost:3000；不会自动启动后端";address.KeyDown+=delegate(object sender,KeyEventArgs e){if(e.Key==Key.Enter){NavigateUrl();e.Handled=true;}};
             information.SetResourceReference(TextBlock.ForegroundProperty,"MutedBrush");Grid.SetRow(information,1);root.Children.Add(information);title.TextTrimming=TextTrimming.CharacterEllipsis;
             Grid.SetRow(content,2);root.Children.Add(content);SetResourceReference(BackgroundProperty,"SurfaceBrush");
-            PreviewMouseWheel+=delegate(object sender,MouseWheelEventArgs e){var reader=content.Children.OfType<FlowDocumentScrollViewer>().FirstOrDefault();if(reader!=null && (Keyboard.Modifiers&ModifierKeys.Control)!=0){reader.Zoom=Math.Max(70,Math.Min(200,reader.Zoom+e.Delta/12.0));e.Handled=true;}};
+            PreviewMouseWheel+=delegate(object sender,MouseWheelEventArgs e){var reader=content.Children.OfType<FlowDocumentScrollViewer>().FirstOrDefault();if(reader!=null && (Keyboard.Modifiers&ModifierKeys.Control)!=0){reader.Zoom=Math.Max(70,Math.Min(200,reader.Zoom+e.Delta/12.0));var zoom=ZoomChanged;if(zoom!=null)zoom((int)Math.Round(reader.Zoom));e.Handled=true;}};
             header.MouseLeftButtonDown+=delegate(object sender,MouseButtonEventArgs e){dragStart=e.GetPosition(header);dragging=true;};header.MouseLeftButtonUp+=delegate{dragging=false;};header.MouseMove+=delegate(object sender,MouseEventArgs e){if(dragging && e.LeftButton==MouseButtonState.Pressed && (e.GetPosition(header)-dragStart).Length>7){dragging=false;DragDrop.DoDragDrop(header,new DataObject("QingyePane","preview"),DragDropEffects.Move);}};
         }
+        internal double ReadingOffset{get{var scroll=FindScroll(content);return Browser==null&&scroll!=null?scroll.VerticalOffset:0;}}
+        static ScrollViewer FindScroll(DependencyObject root){var own=root as ScrollViewer;if(own!=null)return own;for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var value=FindScroll(VisualTreeHelper.GetChild(root,i));if(value!=null)return value;}return null;}
+        internal bool CanRestoreReading(Document doc){if(Browser!=null||shown!=doc)return false;string extension=FilePresentation.Extension(doc);bool parsed=new[]{".md",".markdown",".mdown",".mkd",".json",".xml",".xaml",".config",".csproj"}.Contains(extension);return parsed?rendered==doc&&renderedRevision==doc.ContentRevision:FindScroll(content)!=null;}
+        internal void RestoreReadingOffset(double value,Action applied=null){if(Browser!=null||Double.IsNaN(value)||Double.IsInfinity(value))return;var target=shown;int current=request;Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,new Action(delegate{if(Browser!=null||shown!=target||current!=request)return;content.UpdateLayout();var scroll=FindScroll(content);if(scroll!=null){scroll.ScrollToVerticalOffset(Math.Max(0,value));if(applied!=null)applied();}}));}
         void Observe(Task task){task.ContinueWith(t=>Dispatcher.BeginInvoke(new Action(delegate{Message(t.Exception.GetBaseException().Message);})),TaskContinuationOptions.OnlyOnFaulted);}
         void Message(string text){rendered=null;renderedPath=null;renderedResources=null;content.Children.Clear();content.Children.Add(new TextBlock{Text=text,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(24),FontSize=15});}
         public async Task ShowAsync(Document doc,IEnumerable<Document> documents,bool force=false)
@@ -307,8 +312,19 @@ namespace Qingye.UI
                 if(Directory.Exists(resolved))throw new IOException("临时网页缓存未能清理："+resolved,last);
             });await cleanup;
         }
+        public bool CanPrint
+        {
+            get
+            {
+                var viewer=content.Children.OfType<FlowDocumentScrollViewer>().FirstOrDefault();
+                if(viewer!=null && viewer.Document!=null)return true;
+                return content.Children.OfType<TextBox>().FirstOrDefault()!=null;
+            }
+        }
+        internal Document ShownDocument{get{return shown;}}
         public bool Print(Window owner)
         {
+            if(!CanPrint)return false;
             var dialog=new PrintDialog();
             if(dialog.ShowDialog()!=true)return false;
             var viewer=content.Children.OfType<FlowDocumentScrollViewer>().FirstOrDefault();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -41,6 +41,11 @@ namespace Qingye.UI
         {
             Content="工作区",Visibility=Visibility.Collapsed
         };
+        readonly WrapPanel replacementRow=new WrapPanel{Visibility=Visibility.Collapsed};
+        readonly CheckBox wholeChoice=new CheckBox{Content="整词"};
+        readonly TextBlock matchCounter=new TextBlock{Text="0/0",VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(6,0,6,0),MinWidth=34};
+        readonly System.Windows.Threading.DispatcherTimer countTimer=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(180)};
+        int countVersion;ICSharpCode.AvalonEdit.Document.TextDocument countedDocument;
         readonly Popup resultsPopup=new Popup
         {
             StaysOpen=false,AllowsTransparency=true,Placement=PlacementMode.Bottom
@@ -73,8 +78,8 @@ namespace Qingye.UI
             }
             ));
             replacement.Margin=new Thickness(8,0,0,0);
-            searchStrip.Children.Add(replacement);
-            searchStrip.Children.Add(Theme.Button(null,"替换全部",delegate
+            replacementRow.Children.Add(replacement);
+            replacementRow.Children.Add(Theme.Button(null,"替换全部",delegate
             {
                 try
                 {
@@ -89,7 +94,12 @@ namespace Qingye.UI
             ));
             searchStrip.Children.Add(regexChoice);
             searchStrip.Children.Add(caseChoice);
-            searchStrip.Children.Add(workspaceChoice);
+            searchStrip.Children.Add(wholeChoice);searchStrip.Children.Add(matchCounter);
+            searchStrip.Children.Add(Theme.Button(null,"替换…",()=>replacementRow.Visibility=replacementRow.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible));
+            searchStrip.Children.Add(workspaceChoice);searchStrip.Children.Add(replacementRow);workspaceChoice.ToolTip="工作区搜索使用不区分大小写的普通文本；替换仅作用于当前文件";workspaceChoice.Click+=delegate{bool local=workspaceChoice.IsChecked!=true;regexChoice.IsEnabled=caseChoice.IsEnabled=wholeChoice.IsEnabled=local;};
+            System.Windows.Automation.AutomationProperties.SetName(matchCounter,"匹配位置与总数");
+            countTimer.Tick+=async delegate{countTimer.Stop();int mine=++countVersion;if(workspaceChoice.IsChecked==true){matchCounter.Text="工作区";return;}if(owner.ActiveEditor==null||String.IsNullOrEmpty(query.Text)){matchCounter.Text="0/0";return;}var source=owner.ActiveEditor.Document;var snapshot=source.CreateSnapshot();string value=query.Text;bool regex=regexChoice.IsChecked==true,caseSensitive=caseChoice.IsChecked==true,whole=wholeChoice.IsChecked==true;try{int[] matches=await Task.Run(()=>Expression(value,regex,caseSensitive,whole).Matches(snapshot.Text).Cast<Match>().Take(10001).Select(m=>m.Index).ToArray());if(mine==countVersion&&Object.ReferenceEquals(source,owner.ActiveEditor.Document)){int index=owner.ActiveEditor.SelectionLength>0?Array.IndexOf(matches,owner.ActiveEditor.SelectionStart)+1:0;matchCounter.Text=matches.Length>10000?"10000+":index+"/"+matches.Length;}}catch{if(mine==countVersion)matchCounter.Text="表达式无效";}};
+            Action recount=delegate{countVersion++;countTimer.Stop();if(searchStrip.Visibility==Visibility.Visible)countTimer.Start();};query.TextChanged+=delegate{recount();};regexChoice.Click+=delegate{recount();};caseChoice.Click+=delegate{recount();};wholeChoice.Click+=delegate{recount();};
             searchStrip.Children.Add(Theme.Button("\uE8BB","",ToggleSearch));
             resultsList.BorderThickness=new Thickness(0);
             resultsList.Background=owner.TryFindResource("SurfaceBrush") as Brush ?? Brushes.White;
@@ -115,6 +125,9 @@ namespace Qingye.UI
                 }
             };
         }
+        internal void Show(bool replace){if(searchStrip.Visibility!=Visibility.Visible)ToggleSearch();replacementRow.Visibility=replace?Visibility.Visible:Visibility.Collapsed;query.Focus();query.SelectAll();countTimer.Stop();countTimer.Start();}
+        internal bool ReplaceVisible{get{return replacementRow.Visibility==Visibility.Visible;}}
+        internal void Next(bool forward){if(searchStrip.Visibility!=Visibility.Visible)Show(false);Find(forward);}
         internal void ToggleSearch()
         {
             searchStrip.Visibility=searchStrip.Visibility==Visibility.Visible?Visibility.Collapsed:Visibility.Visible;
@@ -126,12 +139,13 @@ namespace Qingye.UI
                 if(owner.ActiveEditor.SelectionLength>0 && owner.ActiveEditor.SelectionLength<200)query.Text=owner.ActiveEditor.SelectedText;
                 query.SelectAll();
             }
-            else { resultsPopup.IsOpen=false; owner.ActiveEditor.Focus(); }
+            else { countTimer.Stop();countVersion++;resultsPopup.IsOpen=false; owner.ActiveEditor.Focus(); }
         }
+        internal void RefreshMatches(bool changed=false){var doc=owner.ActiveEditor==null?null:owner.ActiveEditor.Document;if(!changed&&Object.ReferenceEquals(doc,countedDocument))return;countedDocument=doc;countVersion++;countTimer.Stop();if(searchStrip.Visibility==Visibility.Visible&&!String.IsNullOrEmpty(query.Text))countTimer.Start();}
         internal void RefreshContext()
         {
             workspaceChoice.Visibility=owner.WorkspaceRoot==null?Visibility.Collapsed:Visibility.Visible;
-            if(owner.WorkspaceRoot==null){workspaceChoice.IsChecked=false;resultsPopup.IsOpen=false;}
+            if(owner.WorkspaceRoot==null){workspaceChoice.IsChecked=false;resultsPopup.IsOpen=false;}bool local=workspaceChoice.IsChecked!=true;regexChoice.IsEnabled=caseChoice.IsEnabled=wholeChoice.IsEnabled=local;
         }
         static Style ResultStyle()
         {
@@ -142,8 +156,9 @@ namespace Qingye.UI
         }
         Regex SearchExpression(string text,bool useRegex,bool matchCase)
         {
-            return new Regex(useRegex?text:Regex.Escape(text),matchCase?RegexOptions.None:RegexOptions.IgnoreCase,TimeSpan.FromMilliseconds(250));
+            return Expression(text,useRegex,matchCase,wholeChoice.IsChecked==true);
         }
+        static Regex Expression(string text,bool regex,bool matchCase,bool whole){string pattern=regex?text:Regex.Escape(text);if(whole)pattern=@"(?<![\p{L}\p{N}_])(?:"+pattern+@")(?![\p{L}\p{N}_])";return new Regex(pattern,matchCase?RegexOptions.None:RegexOptions.IgnoreCase,TimeSpan.FromMilliseconds(250));}
         void Find(bool forward)
         {
             if(String.IsNullOrEmpty(query.Text) || owner.ActiveEditor==null)return;
@@ -162,7 +177,7 @@ namespace Qingye.UI
                 selected=selected??(forward?matches.First():matches.Last());
                 owner.ActiveEditor.Select(selected.Index,selected.Length);
                 owner.ActiveEditor.ScrollToLine(owner.ActiveEditor.Document.GetLineByOffset(selected.Index).LineNumber);
-                owner.SetNotice("找到 "+matches.Length+" 处");
+                int number=Array.IndexOf(matches,selected)+1;matchCounter.Text=number+"/"+matches.Length;owner.SetNotice("第 "+number+" / "+matches.Length+" 处");
             }
             catch(Exception ex)
             {

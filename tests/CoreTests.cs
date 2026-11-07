@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
 using System.Linq;
@@ -81,6 +81,18 @@ namespace Qingye.Tests
             try
             {
 
+                Test("Optional usage history creates nothing by default",delegate{
+                    string directory=Path.Combine(root,"usage-default");var store=new UsageStore(directory);var options=store.LoadOptions();Check(!options.RecentFiles&&!options.ReadingPositions&&!options.RecoverDrafts,"Unexpected opt-in default");store.Remember(new[]{new UsageEntry{Path="example.txt",Caret=20,Time=1}});Check(!Directory.Exists(directory),"Default reader wrote usage data");
+                });
+                Test("Usage options are independent and history is bounded",delegate{
+                    var store=new UsageStore(Path.Combine(root,"usage-options"));store.SaveOptions(new UsageOptions{ReadingPositions=true});Check(store.LoadOptions().ReadingPositions&&!store.LoadOptions().RecentFiles,"Options became coupled");store.Remember(Enumerable.Range(0,80).Select(i=>new UsageEntry{Path="file-"+i,Caret=i,Time=i}));Check(store.LoadEntries().Count==40&&store.LoadEntries()[0].Caret==79,"Metadata bounds/order changed");store.SaveOptions(new UsageOptions());Check(store.LoadEntries().Count==0,"Opt-out left metadata behind");
+                });
+                Test("Concurrent windows merge metadata rather than replace it",delegate{
+                    string path=Path.Combine(root,"usage-merge");var first=new UsageStore(path);var second=new UsageStore(path);first.SaveOptions(new UsageOptions{RecentFiles=true});Task.WaitAll(Task.Run(()=>first.Remember(new[]{new UsageEntry{Path="first.txt",Time=2,Caret=10}})),Task.Run(()=>second.Remember(new[]{new UsageEntry{Path="second.txt",Time=3,Caret=20}})));var entries=first.LoadEntries();Check(entries.Count==2&&entries.All(e=>e.Caret==0),"Concurrent write lost entries or retained disabled positions");
+                });
+                Test("Recovery excludes active windows and respects snapshot budgets",delegate{
+                    string path=Path.Combine(root,"draft-budget");var first=new DraftStore(path);var second=new DraftStore(path);first.Write(new[]{new DraftItem{Id="large",Text=new string('x',1024*1024+1)}});Check(!Directory.Exists(path),"Oversized draft was written");first.Write(Enumerable.Range(0,12).Select(i=>new DraftItem{Id=i.ToString(),Text="draft "+i}));Check(second.Pending().Count==0,"Read another active window's drafts");var lease=typeof(DraftStore).GetField("lease",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance);((FileStream)lease.GetValue(first)).Dispose();lease.SetValue(first,null);var pending=second.Pending();Check(pending.Count==8,"Draft count was not bounded");second.Remove(pending[0]);Check(second.Pending().Count==7,"Removing one draft deleted siblings");second.ClearPending();Check(second.Pending().Count==0,"Discard failed to clear pending drafts");first.ClearOwn();
+                });
                 Test("Failed GB18030 index builds do not accumulate metadata",delegate{
                     for(int attempt=0;attempt<12;attempt++)
                     {
@@ -327,6 +339,15 @@ namespace Qingye.Tests
                     Check(QuickOpenFiles.Collect(folder,1,CancellationToken.None).Count==1,"Quick open ignored its file limit");
                     Check(QuickOpenFiles.Matches("ProjectNotes.md","x","pnt") && QuickOpenFiles.Matches("ProjectNotes.md","x\\notes","NOTES") && !QuickOpenFiles.Matches("ProjectNotes.md","x","zz"),"Quick open matching failed");
                     var cancellation=new CancellationTokenSource();cancellation.Cancel();bool canceled=false;try{QuickOpenFiles.Collect(folder,20,cancellation.Token);}catch(OperationCanceledException){canceled=true;}Check(canceled,"Quick open ignored cancellation");
+                });
+                Test("Remembered appearance never persists the session view layout",delegate{
+                    string path=Path.Combine(root,"remembered-preferences.xml");
+                    new Settings{RememberAppearance=true,Theme="warm",Layout="preview"}.Save(path);
+                    var loaded=Settings.Load(path);
+                    Check(loaded.RememberAppearance && loaded.Theme=="warm","Remembered appearance did not round-trip");
+                    Check(loaded.Layout=="single","Session view layout was restored from preferences");
+                    Check(!File.ReadAllText(path).Contains("Layout"),"Preferences still store a layout element");
+                    new Settings{RememberAppearance=false}.Save(path);
                 });
             }
             finally { if(FileService.IsInsideRoot(AppDomain.CurrentDomain.BaseDirectory,root))Directory.Delete(root,true); }

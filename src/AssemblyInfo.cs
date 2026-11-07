@@ -5,3 +5,6 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyTitle("轻页")]
 [assembly: AssemblyProduct("轻页")]
 [assembly: AssemblyDescription("本地文件阅读与简单编辑")]
+
+[assembly: InternalsVisibleTo("UsabilityTests")]
+[assembly: InternalsVisibleTo("ScrollProbe")]

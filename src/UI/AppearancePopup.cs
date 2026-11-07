@@ -258,7 +258,7 @@ namespace Qingye.UI
             });
             var slider=new Slider
             {
-                Minimum=10,Maximum=30,Value=Appearance.FontSize,Width=208,TickFrequency=1,IsSnapToTickEnabled=true
+                Minimum=10,Maximum=40,Value=Appearance.FontSize,Width=208,TickFrequency=1,IsSnapToTickEnabled=true
             };
             fontLine.Children.Add(slider);
             var sizeLabel=new TextBlock
@@ -266,32 +266,45 @@ namespace Qingye.UI
                 Text=Appearance.FontSize.ToString("0"),Margin=new Thickness(10,0,0,0)
             };
             fontLine.Children.Add(sizeLabel);
+            var fontPreview=new TextBlock
+            {
+                Text="Aa 中文代码 0123 ()[]",FontSize=Appearance.FontSize,FontFamily=EditorFonts.Compose(Appearance.FontFamily),Margin=new Thickness(42,2,0,8),TextTrimming=TextTrimming.CharacterEllipsis
+            };
+            fontPreview.SetResourceReference(TextBlock.ForegroundProperty,"TextBrush");
             slider.ValueChanged+=delegate
             {
                 Appearance.FontSize=slider.Value;
                 sizeLabel.Text=slider.Value.ToString("0");
+                fontPreview.FontSize=slider.Value;
                 owner.ApplyAppearance();
             };
             advanced.Children.Add(fontLine);
+            var zoomHint=new TextBlock
+            {
+                Text="Ctrl+滚轮 / Ctrl+= / Ctrl+- 缩放编辑字号，Ctrl+0 重置",FontSize=11,TextWrapping=TextWrapping.Wrap,Margin=new Thickness(42,0,0,8)
+            };
+            zoomHint.SetResourceReference(TextBlock.ForegroundProperty,"MutedBrush");
+            advanced.Children.Add(zoomHint);
+            advanced.Children.Add(Theme.Button(null,"重置字号缩放（100%）",delegate{owner.ResetTextZoom();}));
             var automatic=new CheckBox
             {
                 Content="按文件类型设置字体与换行",IsChecked=Appearance.FileAwareDefaults
             };
             advanced.Children.Add(automatic);
+            var fontChoices=new List<string>(EditorFonts.Choices);
+            if(!String.IsNullOrEmpty(Appearance.FontFamily) && !fontChoices.Contains(Appearance.FontFamily))fontChoices.Insert(0,Appearance.FontFamily);
             var fonts=new ComboBox
             {
-                ItemsSource=new[]
-                {
-                    "Consolas","Cascadia Mono","Microsoft YaHei UI","Segoe UI"
-                },
-                SelectedItem=Appearance.FontFamily,Margin=new Thickness(0,0,0,6)
+                ItemsSource=fontChoices,SelectedItem=Appearance.FontFamily,Margin=new Thickness(0,0,0,6)
             };
             fonts.SelectionChanged+=delegate
             {
                 Appearance.FontFamily=(string)fonts.SelectedItem;
+                fontPreview.FontFamily=EditorFonts.Compose(Appearance.FontFamily);
                 owner.ApplyAppearance();
             };
             advanced.Children.Add(fonts);
+            advanced.Children.Add(fontPreview);
             var wrap=new CheckBox
             {
                 Content="自动换行",IsChecked=Appearance.Wrap
@@ -349,6 +362,8 @@ namespace Qingye.UI
             {
                 Header="阅读设置",Content=advanced,Margin=new Thickness(4,16,4,12)
             });
+            panel.Children.Add(Theme.Button(null,"本地记录与恢复…",()=>{Close();owner.ShowPrivacySettings();}));
+            panel.Children.Add(Theme.Button(null,"命令面板  Ctrl+Shift+P",()=>{Close();owner.ShowCommands();}));
             panel.Children.Add(Theme.Line());
             var help=new StackPanel
             {

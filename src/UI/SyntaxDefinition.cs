@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Xml;
 using System.Linq;
@@ -10,6 +10,7 @@ namespace Qingye.UI
 {
     static class SyntaxDefinition
     {
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IHighlightingDefinition,object> themed=new System.Runtime.CompilerServices.ConditionalWeakTable<IHighlightingDefinition,object>();
         sealed class ResourceBrush : HighlightingBrush
         {
             readonly string token;
@@ -21,7 +22,7 @@ namespace Qingye.UI
         }
         public static void UseTheme(IHighlightingDefinition definition)
         {
-            if (definition == null) return;
+            if (definition == null) return;object applied;if(themed.TryGetValue(definition,out applied))return;
             foreach (var color in definition.NamedHighlightingColors)
             {
                 string name = (color.Name ?? "").ToLowerInvariant();
@@ -32,6 +33,7 @@ namespace Qingye.UI
                 color.Foreground = new ResourceBrush(token);
                 if (color.Background != null) color.Background = new ResourceBrush("CodeBackground");
             }
+            themed.Add(definition,new object());
         }
         static IHighlightingDefinition json,config;
         static IHighlightingDefinition Load(string name,string rules)

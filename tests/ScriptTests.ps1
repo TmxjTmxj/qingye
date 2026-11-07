@@ -1,6 +1,17 @@
 ﻿$ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 . (Join-Path $root 'scripts/paths.ps1')
+# PowerShell 5.1 decodes BOM-less scripts as ANSI; non-ASCII literals (such as
+# 轻页.exe) would silently turn into different file names.
+foreach($script in @(Get-ChildItem -LiteralPath (Join-Path $root 'scripts') -Filter '*.ps1')+@(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1'))
+{
+  $bytes=[IO.File]::ReadAllBytes($script.FullName)
+  $hasBom=$bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+  $nonAscii=$false
+  for($index=0;$index -lt $bytes.Length;$index++){if($bytes[$index] -gt 127){$nonAscii=$true;break;}}
+  if($nonAscii -and -not $hasBom){throw "PowerShell script needs a UTF-8 BOM: $($script.Name)"}
+}
+Write-Output 'PASS PowerShell scripts with non-ASCII text keep their UTF-8 BOM'
 $version=(Get-Content -LiteralPath (Join-Path $root 'VERSION') -Raw).Trim()
 $terminalAssets=Join-Path $root 'src/Assets/Terminal'
 $vendor=Get-Content -LiteralPath (Join-Path $terminalAssets 'vendor-lock.json') -Raw | ConvertFrom-Json
@@ -31,7 +42,7 @@ try {
   $zipPath=Join-Path $root "release/轻页-$version-win-x64.zip"
   $zip=[IO.Compression.ZipFile]::OpenRead($zipPath)
   try {
-    if($zip.Entries.FullName | Where-Object {$_ -match '(^|/)(Harness|node_modules|agent-data|agent-history|模型.txt|preferences.xml)(/|$)' -or $_.EndsWith([IO.Path]::GetFileName($personal))}){throw 'Private or retired runtime file in package'}
+    if($zip.Entries.FullName | Where-Object {$_ -match '(^|/)(Harness|node_modules|agent-data|agent-history|模型.txt|preferences.xml|usage-options.json|usage-history.json|drafts)(/|$)' -or $_.EndsWith([IO.Path]::GetFileName($personal))}){throw 'Private or retired runtime file in package'}
     if(-not(Test-Path -LiteralPath $personal)){throw 'Personal app file was removed'}
     Write-Output 'PASS package excludes private files and retired Agent/Node'
     $manifest=Get-Content -LiteralPath (Join-Path $root 'release/SHA256.txt')

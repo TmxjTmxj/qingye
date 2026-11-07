@@ -19,6 +19,7 @@ namespace Qingye.UI
     internal sealed class DocumentBar : UserControl
     {
         readonly MainWindow owner;
+        Document displayedDocument;string displayedTitle,displayedPath,displayedLayout,displayedIcon;DocumentKind displayedKind;bool displayedDirty;
         readonly Grid documentBar;
         readonly DockPanel fileInfo;
         readonly StackPanel viewActions;
@@ -148,24 +149,26 @@ namespace Qingye.UI
             System.Windows.Automation.AutomationProperties.SetName(systemOpenButton,"使用系统关联软件打开");
             viewActions.Children.Add(systemOpenButton);
         }
+        internal object FileIcon{get{return documentIcon.Content;}}
         internal void Update(Document doc)
         {
             var Appearance=owner.Appearance;
+            if(Object.ReferenceEquals(displayedDocument,doc)&&displayedTitle==doc.Title&&displayedPath==doc.Path&&displayedKind==doc.Kind&&displayedDirty==doc.IsDirty&&displayedLayout==Appearance.Layout)return;
+            displayedDocument=doc;displayedTitle=doc.Title;displayedPath=doc.Path;displayedKind=doc.Kind;displayedDirty=doc.IsDirty;displayedLayout=Appearance.Layout;
             var profile=FilePresentation.For(doc);
             documentName.Text=doc.Title+(doc.IsDirty?"  •":"");
             documentName.ToolTip=doc.Path??"未保存文档";
             documentType.Text=profile.Name+"  /  "+profile.Description;
             documentType.ToolTip=documentType.Text;
-            documentIcon.Content=new IconView(profile.Icon,22)
-            {
-                Foreground=TryFindResource("AccentBrush") as Brush
-            };
+            if(displayedIcon!=profile.Icon){var icon=new IconView(profile.Icon,22);icon.SetResourceReference(Control.ForegroundProperty,"AccentBrush");documentIcon.Content=icon;displayedIcon=profile.Icon;}
             readViewButton.Content=profile.ReaderLabel??"阅读";
             readViewButton.IsEnabled=profile.CanRead;
             splitViewButton.IsEnabled=profile.CanRead && doc.Kind==DocumentKind.Text;
             wysiwygButton.IsEnabled=profile.CanWysiwyg;
             sourceViewButton.Content=profile.Prose || doc.Kind==DocumentKind.Xlsx?"文本":doc.Kind==DocumentKind.Binary?"十六进制":"源码";
             sourceViewButton.IsEnabled=doc.Kind!=DocumentKind.Image && doc.Kind!=DocumentKind.Pdf && doc.Kind!=DocumentKind.Rtf && doc.Kind!=DocumentKind.Epub;
+            System.Windows.Automation.AutomationProperties.SetName(readViewButton,(readViewButton.Content as string)??"阅读");
+            System.Windows.Automation.AutomationProperties.SetName(sourceViewButton,(sourceViewButton.Content as string)??"源码");
             systemOpenButton.IsEnabled=doc.Path!=null;
             foreach(var button in new[]
             {

@@ -6,6 +6,7 @@
 | Lucide SVG icons | commit 500620a2e8123f8d1db191538886dc0c223f69a9 | ISC/MIT notices in `Lucide-LICENSE.txt`, https://github.com/lucide-icons/lucide |
 | Markdig | 1.4.0 | BSD-2-Clause, `Markdig-LICENSE.txt`, https://github.com/xoofx/markdig |
 | xterm.js | 6.0.0 | MIT, `xterm-LICENSE.txt`, https://github.com/xtermjs/xterm.js |
+| @xterm/addon-search | 0.16.0 | MIT, `xterm-LICENSE.txt`, https://github.com/xtermjs/xterm.js |
 | @xterm/addon-fit | 0.11.0 | MIT, `xterm-LICENSE.txt`, https://github.com/xtermjs/xterm.js |
 | @xterm/addon-unicode-graphemes | 0.4.0 | MIT, `xterm-LICENSE.txt`, https://github.com/xtermjs/xterm.js |
 | @xterm/addon-webgl | 0.19.0 | MIT, `xterm-LICENSE.txt`, https://github.com/xtermjs/xterm.js |

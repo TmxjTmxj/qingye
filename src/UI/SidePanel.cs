@@ -22,7 +22,7 @@ namespace Qingye.UI
         readonly TextBlock filesHint = new TextBlock();
         readonly Grid filesPage = new Grid();
         readonly DispatcherTimer outlineTimer = new DispatcherTimer();
-        bool outlineMode;
+        bool outlineMode,filesStale;
         bool? forcedVisible;
 
         internal SidePanel(MainWindow window, WorkspaceTree workspace)
@@ -112,6 +112,7 @@ namespace Qingye.UI
 
             outlineTimer.Interval = TimeSpan.FromMilliseconds(400);
             outlineTimer.Tick += delegate { outlineTimer.Stop(); RefreshOutline(owner.Current); };
+            IsVisibleChanged+=delegate{if(IsVisible&&filesStale&&!outlineMode)RefreshFiles();};
             SetMode(false);
         }
 
@@ -180,6 +181,7 @@ namespace Qingye.UI
 
         internal void RefreshFiles()
         {
+            if(!IsVisible||outlineMode){filesStale=true;return;}filesStale=false;
             openFiles.Items.Clear();
             foreach (var doc in owner.Session.Documents)
             {

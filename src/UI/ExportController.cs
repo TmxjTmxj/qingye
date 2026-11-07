@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -25,11 +25,12 @@ namespace Qingye.UI
             }
         }
 
-        internal void Export(Document doc)
+        internal void Export(Document doc,ExportFormat? preferred=null)
         {
             if (doc == null) return;
             var formats = FormatExport.Formats(doc);
             if (formats.Count == 0) { owner.SetNotice("此类型没有可导出的格式"); return; }
+            if(preferred.HasValue){if(!formats.Contains(preferred.Value)){owner.SetNotice("此文件不能导出为 "+FormatExport.Name(preferred.Value));return;}formats=formats.OrderBy(f=>f==preferred.Value?0:1).ToList();}
             string filter = FormatExport.Filter(formats);
             string suggested = Path.GetFileNameWithoutExtension(doc.Title ?? "导出");
             string target = Dialogs.PickExport(owner, suggested, filter);

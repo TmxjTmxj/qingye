@@ -15,7 +15,7 @@ namespace Qingye.Core
         public bool LineNumbers = true;
         public bool FileAwareDefaults = true;
         public bool RememberAppearance = false;
-        public string Layout = "single";
+        [XmlIgnore] public string Layout = "single";
         public string PreviewPosition = "right";
         public bool EditorsVertical = true;
         public double EditorRatio = .54;
@@ -32,7 +32,6 @@ namespace Qingye.Core
                     var value=(Settings)new XmlSerializer(typeof(Settings)).Deserialize(reader);
                     if(!value.RememberAppearance)return new Settings();
                     if(value.Theme!="mint" && value.Theme!="warm" && value.Theme!="lilac" && value.Theme!="dark")value.Theme="mint";
-                    if(value.Layout!="single" && value.Layout!="compare" && value.Layout!="preview")value.Layout="single";
                     if(value.PreviewPosition!="left" && value.PreviewPosition!="right" && value.PreviewPosition!="bottom")value.PreviewPosition="right";
                     if(!Regex.IsMatch(value.Accent??"","^#[0-9A-Fa-f]{6}$"))value.Accent="";
                     value.FontSize=Math.Max(10,Math.Min(40,Double.IsNaN(value.FontSize)?15:value.FontSize));

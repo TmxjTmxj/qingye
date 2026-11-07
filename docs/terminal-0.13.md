@@ -21,7 +21,7 @@
 
 输出队列施加背压并等待 xterm.write 确认，不丢弃控制序列；滚动历史限 5000 行。输入由独立写入任务处理。每窗口独立 ConPTY、子进程 Job 和临时 WebView 配置目录；关闭窗口时停止所属进程并清理配置。崩溃或系统阻止删除时，临时目录可能留存。
 
-组件固定版本：xterm 6.0.0、fit 0.11.0、unicode-graphemes 0.4.0、webgl 0.19.0。来源与完整性见 `src/Assets/Terminal/vendor-lock.json`，许可见 `licenses/xterm-LICENSE.txt`。使用已有系统 WebView2；未将 WebView2 Runtime 打入便携包。
+组件固定版本：xterm 6.0.0、fit 0.11.0、unicode-graphemes 0.4.0、webgl 0.19.0、search 0.16.0（终端内查找用 `@xterm/addon-search`）。来源与完整性见 `src/Assets/Terminal/vendor-lock.json`，许可见 `licenses/xterm-LICENSE.txt`。使用已有系统 WebView2；未将 WebView2 Runtime 打入便携包。
 
 ## 验收范围
 

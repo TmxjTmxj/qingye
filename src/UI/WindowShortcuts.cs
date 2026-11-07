@@ -25,6 +25,8 @@ namespace Qingye.UI
             if(control && e.Key==Key.Oem3){owner.ToggleTerminal();e.Handled=true;return;}
             if(control && shift && e.Key==Key.N){owner.NewWindow();e.Handled=true;return;}
             if(control && alt && e.Key==Key.P){owner.PrintCurrent();e.Handled=true;return;}
+            if(control&&shift&&e.Key==Key.P){owner.ShowCommands();e.Handled=true;return;}
+            if(control&&shift&&e.Key==Key.T){owner.Observe(owner.Usage.ReopenAsync());e.Handled=true;return;}
             if(owner.terminalPanel.IsKeyboardFocusWithin)return;
             if(e.Key==Key.Escape && owner.search.searchStrip.Visibility==Visibility.Visible)
             {
@@ -32,6 +34,7 @@ namespace Qingye.UI
                 e.Handled=true;
                 return;
             }
+            if(e.Key==Key.F3){owner.search.Next(!shift);e.Handled=true;return;}
             if(!control)return;
             if(!alt && (e.Key==Key.Tab || e.Key==Key.PageUp || e.Key==Key.PageDown))
             {
@@ -95,8 +98,7 @@ namespace Qingye.UI
             }
             else if(e.Key==Key.F || e.Key==Key.H)
             {
-                if(owner.search.searchStrip.Visibility!=Visibility.Visible)owner.ToggleSearch();
-                else owner.search.query.Focus();
+                owner.search.Show(e.Key==Key.H);
                 e.Handled=true;
             }
             else if(e.Key==Key.K)
@@ -112,14 +114,17 @@ namespace Qingye.UI
             }
             else if(e.Key==Key.OemPlus || e.Key==Key.Add)
             {
-                owner.Appearance.FontSize=Math.Min(40,owner.Appearance.FontSize+1);
-                owner.ApplyAppearance();
+                owner.AdjustTextZoom(1);
                 e.Handled=true;
             }
             else if(e.Key==Key.OemMinus || e.Key==Key.Subtract)
             {
-                owner.Appearance.FontSize=Math.Max(10,owner.Appearance.FontSize-1);
-                owner.ApplyAppearance();
+                owner.AdjustTextZoom(-1);
+                e.Handled=true;
+            }
+            else if(e.Key==Key.D0 || e.Key==Key.NumPad0)
+            {
+                owner.ResetTextZoom();
                 e.Handled=true;
             }
         }

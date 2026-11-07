@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -12,6 +12,7 @@ namespace Qingye.UI
 {
     public static class Dialogs
     {
+        static string InitialDirectory(Window owner){var window=owner as MainWindow;return window!=null?(window.WorkspaceRoot??(window.Current!=null&&window.Current.Path!=null?Path.GetDirectoryName(window.Current.Path):Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))):Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);}
         public static string[] ParseSelection(string raw){var parts=raw.Split(new[]{'\0'},StringSplitOptions.RemoveEmptyEntries);return parts.Length<=1?parts:parts.Skip(1).Select(name=>Path.Combine(parts[0],name)).ToArray();}
         [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)] class OpenFileName
         {
@@ -22,13 +23,13 @@ namespace Qingye.UI
         public static string[] PickFiles(Window owner,bool multiple)
         {
             IntPtr buffer=Marshal.AllocHGlobal(65536*2);Marshal.Copy(new byte[65536*2],0,buffer,65536*2);
-            try{var data=new OpenFileName{owner=new WindowInteropHelper(owner).Handle,filter="所有文件\0*.*\0文本与代码\0*.txt;*.md;*.log;*.json;*.html;*.css;*.js;*.py;*.cs;*.csv;*.xml;*.yaml\0\0",file=buffer,maxFile=65536,title=multiple?"导入更多文件（仅本次）":"打开文件（替换当前）",flags=0x00080000|0x00001000|0x00000800|0x00000008|0x02000000|(multiple?0x00000200:0)};return GetOpenFileName(data)?ParseSelection(Marshal.PtrToStringUni(buffer,65536)):new string[0];}
+            try{var data=new OpenFileName{owner=new WindowInteropHelper(owner).Handle,filter="所有文件\0*.*\0文本与代码\0*.txt;*.md;*.log;*.json;*.html;*.css;*.js;*.py;*.cs;*.csv;*.xml;*.yaml\0\0",file=buffer,maxFile=65536,initialDirectory=InitialDirectory(owner),title=multiple?"导入更多文件（仅本次）":"打开文件（替换当前）",flags=0x00080000|0x00001000|0x00000800|0x00000008|0x02000000|(multiple?0x00000200:0)};return GetOpenFileName(data)?ParseSelection(Marshal.PtrToStringUni(buffer,65536)):new string[0];}
             finally{Marshal.FreeHGlobal(buffer);}
         }
         public static string PickSave(Window owner,string filename)
         {
             IntPtr buffer=Marshal.AllocHGlobal(65536*2);Marshal.Copy(new byte[65536*2],0,buffer,65536*2);byte[] initial=Encoding.Unicode.GetBytes((Path.GetFileName(filename??"未命名.txt"))+"\0");Marshal.Copy(initial,0,buffer,initial.Length);
-            try{var data=new OpenFileName{owner=new WindowInteropHelper(owner).Handle,filter="所有文件\0*.*\0\0",file=buffer,maxFile=65536,title="保存文件",flags=0x00080000|0x00000800|0x00000002|0x00000008|0x02000000};return GetSaveFileName(data)?Marshal.PtrToStringUni(buffer):null;}
+            try{var data=new OpenFileName{owner=new WindowInteropHelper(owner).Handle,filter="所有文件\0*.*\0\0",file=buffer,maxFile=65536,initialDirectory=String.IsNullOrEmpty(Path.GetDirectoryName(filename))?InitialDirectory(owner):Path.GetDirectoryName(filename),title="保存文件",flags=0x00080000|0x00000800|0x00000002|0x00000008|0x02000000};return GetSaveFileName(data)?Marshal.PtrToStringUni(buffer):null;}
             finally{Marshal.FreeHGlobal(buffer);}
         }
         public static string PickExport(Window owner,string filename,string filter)
@@ -37,7 +38,7 @@ namespace Qingye.UI
             byte[] initial=Encoding.Unicode.GetBytes((Path.GetFileName(filename??"导出.txt"))+"\0");Marshal.Copy(initial,0,buffer,initial.Length);
             try
             {
-                var data=new OpenFileName{owner=new WindowInteropHelper(owner).Handle,filter=filter+"\0\0",file=buffer,maxFile=65536,title="导出为",flags=0x00080000|0x00000002|0x00000008|0x02000000};
+                var data=new OpenFileName{owner=new WindowInteropHelper(owner).Handle,filter=filter+"\0\0",file=buffer,maxFile=65536,initialDirectory=InitialDirectory(owner),title="导出为",flags=0x00080000|0x00000002|0x00000008|0x02000000};
                 if(!GetSaveFileName(data))return null;
                 string path=Marshal.PtrToStringUni(buffer);
                 if(!String.IsNullOrEmpty(path) && String.IsNullOrEmpty(Path.GetExtension(path)))

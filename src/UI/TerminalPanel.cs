@@ -38,7 +38,8 @@ namespace Qingye.UI
             var title=new TextBlock{Text="终端",FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,14,0)};title.SetResourceReference(TextBlock.ForegroundProperty,"AccentBrush");header.Children.Add(title);
             var tools=new StackPanel{Orientation=Orientation.Horizontal};DockPanel.SetDock(tools,Dock.Right);header.Children.Add(tools);
             var actions=Theme.Button("ellipsis","",delegate{});actions.ToolTip="终端操作与位置";actions.Click+=delegate{ShowMenu(actions);};tools.Children.Add(actions);
-            var restart=Theme.Button("plus","",Start);restart.ToolTip="启动 CMD（复用当前会话）";tools.Children.Add(restart);
+            var find=Theme.Button("search","",Find);find.ToolTip="查找终端输出  Ctrl+F";tools.Children.Add(find);var bottom=Theme.Button("chevron-down","",Bottom);bottom.ToolTip="回到最新输出";tools.Children.Add(bottom);
+            var restart=Theme.Button("rotate-cw","",Start);restart.ToolTip="启动或复用 CMD（不会新建标签）";tools.Children.Add(restart);
             var hide=Theme.Button("x","",owner.ToggleTerminal);hide.ToolTip="收起终端  Ctrl+`（会话继续）";tools.Children.Add(hide);
             status=new TextBlock{Text="CMD · 按需启动",FontSize=11,VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};status.SetResourceReference(TextBlock.ForegroundProperty,"MutedBrush");header.Children.Add(status);
             root.Children.Add(surface);Content=root;
@@ -47,6 +48,7 @@ namespace Qingye.UI
         void ShowMenu(FrameworkElement anchor)
         {
             var menu=new ContextMenu();menu.Items.Add(Theme.Menu("停靠底部",()=>SetDock("bottom")));menu.Items.Add(Theme.Menu("停靠右侧",()=>SetDock("right")));menu.Items.Add(new Separator());
+            menu.Items.Add(Theme.Menu("查找终端输出  Ctrl+F",Find));menu.Items.Add(Theme.Menu("回到最新输出",Bottom));
             menu.Items.Add(Theme.Menu("复制所选内容  Ctrl+Shift+C",()=>Post(new{type="selection"})));menu.Items.Add(Theme.Menu("粘贴  Ctrl+V",Paste));
             menu.Items.Add(Theme.Menu("清除滚动历史（保留当前画面）",()=>Post(new{type="clear"})));
             menu.Items.Add(Theme.Menu("字号放大  Ctrl++",()=>Zoom(1)));menu.Items.Add(Theme.Menu("字号缩小  Ctrl+-",()=>Zoom(-1)));menu.Items.Add(Theme.Menu("重置字号  Ctrl+0",()=>Zoom(0)));
@@ -55,6 +57,10 @@ namespace Qingye.UI
         }
         string DirectoryPath(){string directory=owner.WorkspaceRoot??(owner.Current!=null&&owner.Current.Path!=null?Path.GetDirectoryName(owner.Current.Path):Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));return Directory.Exists(directory)?directory:Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);}
         void OpenSystemCmd(){Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"cmd.exe")){WorkingDirectory=DirectoryPath(),UseShellExecute=true});}
+        internal void DockTo(string dock){if(!owner.terminalVisible)owner.ToggleTerminal();SetDock(dock);}
+        internal void Bottom(){FocusInput();Post(new{type="bottom"});}
+        internal void Find(){Dispatcher.BeginInvoke(new Action(()=>owner.Observe(FindAsync())));}
+        async Task FindAsync(){if(!owner.terminalVisible)owner.ToggleTerminal();await startTask;if(Browser!=null&&Browser.CoreWebView2!=null){Browser.Focus();Post(new{type="find"});}}
         void SetDock(string dock){owner.Appearance.TerminalDock=dock;owner.Appearance.TerminalSize=dock=="right"?420:300;owner.UpdateToolbar();FocusInput();}
         void FocusInput(){if(disposed||!visible||Browser==null||!Browser.IsVisible)return;Browser.Focus();Post(new{type="focus"});}
         internal void Reveal(){visible=true;Start();FocusInput();}
@@ -72,9 +78,9 @@ namespace Qingye.UI
                 if(disposed||resetGeneration!=generation)return;
                 var current=new TerminalSession();session=current;int mine=generation;
                 current.Output+=text=>Enqueue(text,mine);
-                current.Exited+=()=>Dispatcher.BeginInvoke(new Action(delegate{if(!disposed&&session==current)status.Text="CMD 已结束 · 点击 + 重开";}));
+                current.Exited+=()=>Dispatcher.BeginInvoke(new Action(delegate{if(!disposed&&session==current)status.Text="CMD 已结束 · 点击启动按钮重开";}));
                 current.Start(DirectoryPath(),columns,rows);
-                status.Text="CMD · "+Path.GetFileName(DirectoryPath());status.ToolTip=DirectoryPath()+"\n真实命令行权限；收起保留会话，关闭窗口结束子进程。";
+                status.Text="CMD · 起始目录 "+DirectoryPath();status.ToolTip="起始目录（不是实时工作目录）："+DirectoryPath()+"\n真实命令行权限；收起保留会话，关闭窗口结束子进程。";
                 FocusInput();Drain();
             }
             catch(Exception error){if(!disposed){RendererError=error.Message;status.Text="终端启动失败："+error.Message;recover=initialization.IsFaulted||initialization.IsCanceled;}}
@@ -122,6 +128,8 @@ namespace Qingye.UI
                     case "paste":Paste();break;
                     case "context":selection=text;var menu=new ContextMenu();menu.Items.Add(Theme.Menu("复制",()=>{if(selection.Length>0)Clipboard.SetText(selection);}));menu.Items.Add(Theme.Menu("粘贴",Paste));menu.PlacementTarget=Browser;menu.IsOpen=true;break;
                     case "toggle":owner.ToggleTerminal();break;
+                    case "commands":owner.ShowCommands();break;
+                    case "reopen":owner.Observe(owner.Usage.ReopenAsync());break;
                     case "newWindow":owner.NewWindow();break;
                     case "closeWindow":owner.Close();break;
                     case "zoomIn":Zoom(1);break;case "zoomOut":Zoom(-1);break;case "zoomReset":Zoom(0);break;
@@ -151,7 +159,7 @@ namespace Qingye.UI
         internal void Send(string text){if(IsRunning)session.Send(text);}
         void Paste(){if(Clipboard.ContainsText())Post(new{type="paste",text=Clipboard.GetText()});}
         void Zoom(int change){fontSize=change==0?14:Math.Max(9,Math.Min(28,fontSize+change));Post(new{type="font",size=fontSize});}
-        internal void Stop(){StopSession();status.Text="会话已结束 · 点击 + 重开";}
+        internal void Stop(){StopSession();status.Text="会话已结束 · 点击启动按钮重开";}
         void StopSession(){lock(outputGate){generation++;output.Clear();queued=0;waiting=0;drainScheduled=false;Monitor.PulseAll(outputGate);}if(session!=null){session.Dispose();session=null;}}
         internal void RefreshAppearance()
         {

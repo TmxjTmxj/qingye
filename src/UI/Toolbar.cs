@@ -24,7 +24,7 @@ namespace Qingye.UI
         readonly List<Button> windowButtons=new List<Button>();
         internal readonly List<Button> toolButtons=new List<Button>();
         readonly List<Border> separators=new List<Border>();
-        internal readonly Button appearanceButton,saveButton,moreTools,terminalButton;
+        internal readonly Button appearanceButton,saveButton,saveDropdown,moreTools,terminalButton;
         internal Toolbar(MainWindow window)
         {
             owner=window;
@@ -154,7 +154,7 @@ namespace Qingye.UI
             saveButton.SetResourceReference(Control.ForegroundProperty,"AccentBrush");
             AddTool(tools,saveButton);
             var saveContent=saveButton.Content as StackPanel;
-            if(saveContent!=null)saveContent.Children.Add(new TextBlock{Text="▾",Tag="ButtonLabel",FontSize=10,Margin=new Thickness(4,0,0,0),VerticalAlignment=VerticalAlignment.Center});
+            saveDropdown=Theme.Button("chevron-down","",delegate{});saveDropdown.ToolTip="另存、导出与打印";System.Windows.Automation.AutomationProperties.SetName(saveDropdown,"另存、导出与打印");saveDropdown.Width=28;saveDropdown.MinHeight=36;saveDropdown.Padding=new Thickness(4);saveDropdown.Margin=new Thickness(0);WindowChrome.SetIsHitTestVisibleInChrome(saveDropdown,true);tools.Children.Add(saveDropdown);
             AddSeparator(tools);
             var saveMenu=new ContextMenu();
             saveMenu.Items.Add(Theme.Menu("另存为  Ctrl+Shift+S",delegate
@@ -177,7 +177,7 @@ namespace Qingye.UI
                 foreach(var doc in owner.Session.Documents.Where(d=>d.IsDirty).ToArray())if(!owner.SaveDocument(doc,false))break;
             }
             ));
-            saveButton.ContextMenu=saveMenu;
+            saveButton.ContextMenu=saveMenu;saveDropdown.Click+=delegate{saveMenu.PlacementTarget=saveDropdown;saveMenu.IsOpen=true;};
             AddTool(tools,Theme.Button("\uE721","搜索",owner.ToggleSearch));
             appearanceButton=Theme.Button("\uE713","外观与布局",delegate
             {
@@ -193,6 +193,7 @@ namespace Qingye.UI
             System.Windows.Automation.AutomationProperties.SetName(terminalButton,"终端");
             AddTool(tools,terminalButton);
             var newMenu=new ContextMenu();newMenu.Items.Add(Theme.Menu("新建文件  Ctrl+N",()=>owner.NewDocument(true)));newMenu.Items.Add(Theme.Menu("新建独立窗口  Ctrl+Shift+N",owner.NewWindow));toolButtons[0].ContextMenu=newMenu;
+            AddTool(tools,Theme.Button("command","命令",owner.ShowCommands));toolButtons.Last().ToolTip="命令面板  Ctrl+Shift+P";
             owner.RegisterName("AppearanceButton",appearanceButton);
             moreTools=Theme.Button("ellipsis","",delegate
             {
@@ -219,6 +220,7 @@ namespace Qingye.UI
                     item.IsEnabled=button.IsEnabled;
                     menu.Items.Add(item);
                 }
+                menu.Items.Add(new Separator());menu.Items.Add(Theme.Menu("命令面板  Ctrl+Shift+P",owner.ShowCommands));menu.Items.Add(Theme.Menu("另存、导出与打印",()=>{saveMenu.PlacementTarget=moreTools;saveMenu.IsOpen=true;}));
                 moreTools.ContextMenu=menu;
                 menu.PlacementTarget=moreTools;
                 menu.IsOpen=true;
@@ -250,6 +252,7 @@ namespace Qingye.UI
                 button.Margin=narrow?new Thickness(1,0,1,0):new Thickness(3,0,3,0);
                 if(narrow)button.Padding=new Thickness(7);
             }
+            saveDropdown.Visibility=saveButton.Visibility;
             moreTools.Visibility=narrow?Visibility.Visible:Visibility.Collapsed;
             foreach(var line in separators)line.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;
             brandName.Visibility=tiny?Visibility.Collapsed:Visibility.Visible;

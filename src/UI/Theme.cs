@@ -35,14 +35,14 @@ namespace Qingye.UI
             if(!String.IsNullOrEmpty(settings.Accent))accent=settings.Accent;
             window.Resources["AccentBrush"]=Brush(accent);window.Resources["PanelBrush"]=Brush(panel);window.Resources["HoverBrush"]=Brush(hover);
             window.Resources["TextBrush"]=Brush(text);window.Resources["LineBrush"]=Brush(line);window.Resources["MutedBrush"]=Brush(muted);window.Resources["SurfaceBrush"]=Brush(surface);
-            string[] tokens = { "CodeBackground", "TableHeader", "Rule", "QuoteBorder", "QuoteText", "SyntaxComment", "SyntaxString", "SyntaxNumber", "SyntaxKeyword", "SyntaxAttribute", "SyntaxHeading" };
-            string[] content = { "#EFF7F4", "#EFF7F4", "#DFE9E4", "#80A995", "#677C72", "#63746A", "#377452", "#97552D", "#52609A", "#77608F", "#466A5A" };
+            string[] tokens = { "CodeBackground", "TableHeader", "Rule", "QuoteBorder", "QuoteText", "SyntaxComment", "SyntaxString", "SyntaxNumber", "SyntaxKeyword", "SyntaxAttribute", "SyntaxHeading", "EditorLineHighlight" };
+            string[] content = { "#EFF7F4", "#EFF7F4", "#DFE9E4", "#80A995", "#677C72", "#63746A", "#377452", "#97552D", "#52609A", "#77608F", "#466A5A", "#F1F8F4" };
             if (settings.Theme == "warm")
-                content = new[] { "#F5F0E7", "#F3EDE2", "#E6DED1", "#B89B75", "#766652", "#796D5B", "#79602F", "#9A512C", "#74538D", "#476E82", "#775B38" };
+                content = new[] { "#F5F0E7", "#F3EDE2", "#E6DED1", "#B89B75", "#766652", "#796D5B", "#79602F", "#9A512C", "#74538D", "#476E82", "#775B38", "#F7F3E9" };
             if (settings.Theme == "lilac")
-                content = new[] { "#F0EDF7", "#EDE8F5", "#E2DBEC", "#A08AB9", "#756780", "#786A83", "#766397", "#995977", "#655594", "#476D89", "#6B5489" };
+                content = new[] { "#F0EDF7", "#EDE8F5", "#E2DBEC", "#A08AB9", "#756780", "#786A83", "#766397", "#995977", "#655594", "#476D89", "#6B5489", "#F3F0F9" };
             if (settings.Theme == "dark")
-                content = new[] { "#2A3430", "#2A3430", "#3A4741", "#6FA98E", "#A9BDB3", "#8FA79B", "#7FC29A", "#E0A06A", "#9DA8E8", "#C19BD8", "#9CC7B2" };
+                content = new[] { "#2A3430", "#2A3430", "#3A4741", "#6FA98E", "#A9BDB3", "#8FA79B", "#7FC29A", "#E0A06A", "#9DA8E8", "#C19BD8", "#9CC7B2", "#24323A" };
             for (int index = 0; index < tokens.Length; index++)
                 window.Resources[tokens[index]] = Brush(content[index]);
             window.Resources["SyntaxText"] = Brush(text);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows.Documents;
 using ICSharpCode.AvalonEdit.Document;
@@ -10,23 +10,31 @@ namespace Qingye.UI
     internal sealed class RichEditSession
     {
         readonly MainWindow owner;
-        readonly MarkdownRichEditor editor;
+        MarkdownRichEditor editor;
         Document document;
         bool active;
 
-        internal RichEditSession(MainWindow owner)
+        internal RichEditSession(MainWindow owner) { this.owner = owner; }
+        internal bool IsCreated { get { return editor != null; } }
+        internal MarkdownRichEditor Editor
         {
-            this.owner = owner;
-            editor = new MarkdownRichEditor(owner);
-            editor.Changed += delegate
+            get
             {
-                if (!active || document == null) return;
-                document.Modified = true;
-                owner.OnBufferChanged();
-            };
+                if (editor == null)
+                {
+                    editor = new MarkdownRichEditor(owner);
+                    editor.ApplyTheme(owner.Appearance);
+                    editor.Changed += delegate
+                    {
+                        if (!active || document == null) return;
+                        document.Modified = true;
+                        owner.OnBufferChanged();
+                    };
+                }
+                return editor;
+            }
         }
-
-        internal MarkdownRichEditor Editor { get { return editor; } }
+        internal void ApplyTheme(Settings settings) { if (editor != null) editor.ApplyTheme(settings); }
         internal bool Active { get { return active; } }
         internal Document Document { get { return document; } }
         internal bool IsEditing(Document doc) { return active && doc == document; }
@@ -39,7 +47,7 @@ namespace Qingye.UI
             if (!owner.buffers.TryGetValue(doc, out buffer)) { owner.primary.Bind(doc); owner.buffers.TryGetValue(doc, out buffer); }
             if (buffer != null && buffer.Text != doc.Text) { bool wasDirty = doc.Modified; doc.Text = buffer.Text; doc.Modified = wasDirty || doc.Modified; }
             string reason;
-            if (!editor.Load(doc, out reason)) { owner.SetNotice(reason); return false; }
+            if (!Editor.Load(doc, out reason)) { owner.SetNotice(reason); return false; }
             document = doc;
             active = true;
             return true;

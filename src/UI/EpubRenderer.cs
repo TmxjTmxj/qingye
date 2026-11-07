@@ -52,6 +52,7 @@ namespace Qingye.UI
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
             viewer.SizeChanged += delegate { double inset = viewer.ActualWidth < 480 ? 16 : 24; flow.PagePadding = new Thickness(inset, 24, inset, 32); };
+            WheelScroll.Attach(viewer);
             return viewer;
         }
 
